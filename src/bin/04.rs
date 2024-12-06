@@ -96,9 +96,38 @@ fn diagonal_candidates_down_left(input: &str) -> Vec<String> {
     candidates
 }
 
+fn x_candidates(input: &str) -> Vec<(String, String)> {
+    let rows = num_rows(input);
+    let cols = num_cols(input);
+
+    let mut candidates: Vec<(String, String)> = vec![];
+
+    let lines: Vec<&str> = input.lines().collect();
+
+    for i_col in 0..cols-2 {
+        for i_start_row in 0..rows-2 {
+            let mut candidate1 = String::new();
+            let mut candidate2 = String::new();
+            for j in 0..3 {
+                let character1 = lines[i_start_row + j].chars().nth(i_col + j).unwrap();
+                let character2 = lines[i_start_row + j].chars().nth(i_col + 2 - j).unwrap();
+                candidate1.push(character1);
+                candidate2.push(character2);
+            }
+            let tup = (candidate1, candidate2);
+            candidates.push(tup);
+        }
+    }
+
+    candidates
+}
 
 pub fn is_xmas(s: &str) -> bool {
     s == "XMAS" || s == "SAMX"
+}
+
+pub fn is_mas(s: &str) -> bool {
+    s == "MAS" || s == "SAM"
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -112,7 +141,9 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let sum_cross = x_candidates(input).into_iter().filter(|(first, second)| is_mas(first) && is_mas(second)).count();
+    let sum: Option<u32> = sum_cross.try_into().ok();
+    sum
 }
 
 #[cfg(test)]
@@ -153,6 +184,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(9));
     }
 }
