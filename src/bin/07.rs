@@ -54,7 +54,7 @@ fn concatenate(left: u64, right: u64) -> u64 {
 
 fn concatenate_first_two(lhs: u64, rest: Vec<u64>) -> Vec<u64> {
     match rest.len() {
-        0 => rest,
+        0 => vec![lhs],
         1 => vec![concatenate(lhs, rest[0])],
         _ => {
             let mut beginning = vec![concatenate(lhs, rest[0])];
@@ -65,12 +65,7 @@ fn concatenate_first_two(lhs: u64, rest: Vec<u64>) -> Vec<u64> {
     }
 }
 
-fn calibration_result_part_2(
-    lhs: Option<u64>,
-    rest: Vec<u64>,
-    test_value: u64,
-    has_concatenated: bool,
-) -> u64 {
+fn calibration_result_part_2(lhs: Option<u64>, rest: Vec<u64>, test_value: u64) -> u64 {
     if rest.len() == 0 {
         // Test if rest equals test_value
         if lhs.expect("lhs must not be empty") == test_value {
@@ -80,40 +75,26 @@ fn calibration_result_part_2(
         }
     }
 
-    let concatenate_variant: u64 = if !has_concatenated {
-        let concatenated_rest = concatenate_first_two(rest.clone());
-        calibration_result_part_2(lhs, concatenated_rest, test_value, true)
-    } else {
-        0
-    };
+    if let Some(lhs_) = lhs {
+        let next = rest.get(0).expect("rest must not be empty").to_owned();
+        let next_rest = rest.get(1..).map_or(vec![], |x| x.to_vec());
 
-    max(
-        if let Some(lhs_) = lhs {
-            let next = rest.get(0).expect("rest must not be empty").to_owned();
-            let next_rest = rest.get(1..).map_or(vec![], |x| x.to_vec());
+        let concatenate_variant: u64 =
+            calibration_result_part_2(Some(concatenate(lhs_, next)), next_rest.clone(), test_value);
 
+        max(
             max(
-                calibration_result_part_2(
-                    Some(lhs_ + next),
-                    next_rest.clone(),
-                    test_value,
-                    has_concatenated,
-                ),
-                calibration_result_part_2(
-                    Some(lhs_ * next),
-                    next_rest,
-                    test_value,
-                    has_concatenated,
-                ),
-            )
-        } else {
-            let next = rest.get(0).expect("rest must not be empty").to_owned();
-            let next_rest = rest.get(1..).map_or(vec![], |x| x.to_vec());
+                calibration_result_part_2(Some(lhs_ + next), next_rest.clone(), test_value),
+                calibration_result_part_2(Some(lhs_ * next), next_rest, test_value),
+            ),
+            concatenate_variant,
+        )
+    } else {
+        let next = rest.get(0).expect("rest must not be empty").to_owned();
+        let next_rest = rest.get(1..).map_or(vec![], |x| x.to_vec());
 
-            calibration_result_part_2(Some(next), next_rest, test_value, has_concatenated)
-        },
-        concatenate_variant,
-    )
+        calibration_result_part_2(Some(next), next_rest, test_value)
+    }
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
@@ -140,7 +121,7 @@ pub fn part_two(input: &str) -> Option<u64> {
 
     let total_calibration_result: u64 = calibration_eqs
         .iter()
-        .map(|eq| calibration_result_part_2(None, eq.values.clone(), eq.test_value, false))
+        .map(|eq| calibration_result_part_2(None, eq.values.clone(), eq.test_value))
         .sum();
 
     Some(total_calibration_result)
@@ -189,8 +170,8 @@ mod tests {
 
     #[test]
     fn test_part_two_156() {
-        // assert_eq!(Some(156), part_two("156: 15 6"));
-        assert_eq!(Some(7290), part_two("7290: 6 8 6 15"));
+        assert_eq!(Some(156), part_two("156: 15 6"));
+        // assert_eq!(Some(7290), part_two("7290: 6 8 6 15"));
         // assert_eq!(Some(192), part_two("192: 17 8 14"));
     }
 }
