@@ -235,7 +235,31 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let board = Board::parse(input)?;
+    let size = board.size.clone();
+    let mut tiles = board.tiles.clone();
+
+    let mut finished = false;
+    let max_steps = 100000;
+
+    let mut steps = 0;
+    while !finished && steps < max_steps {
+        // println!("{}", steps);
+        // let cloned_tiles = tiles.clone();
+        // Board::print(&Board { tiles: cloned_tiles, size });
+        finished = step(&mut tiles, &size);
+        steps += 1;
+    }
+
+    let count: u32 = tiles
+        .clone()
+        .iter()
+        .filter(|(_, tile)| matches!(tile, Tile::Visited))
+        .count()
+        .try_into()
+        .unwrap();
+
+    Some(count)
 }
 
 #[cfg(test)]
@@ -251,6 +275,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(6));
     }
 }
