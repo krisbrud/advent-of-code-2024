@@ -8,7 +8,7 @@ advent_of_code::solution!(9);
 #[derive(Clone, Copy)]
 struct DiskMapEntry {
     blocks: u8,
-    skip: Option<u8>,
+    skip: u8,
 }
 
 impl DiskMapEntry {
@@ -16,11 +16,11 @@ impl DiskMapEntry {
         match s.len() {
             2 => Some(DiskMapEntry {
                 blocks: s[0].to_string().parse().ok()?,
-                skip: Some(s[1].to_string().parse().ok()?),
+                skip: s[1].to_string().parse().ok()?,
             }),
             1 => Some(DiskMapEntry {
                 blocks: s[0].to_string().parse().ok()?,
-                skip: None,
+                skip: 0,
             }),
             _ => None,
         }
@@ -54,10 +54,8 @@ impl DiskMap {
             }
 
             // Last entry will not have skip
-            if let Some(skip) = entry.skip {
-                for _ in 0..skip {
-                    out.push(None);
-                }
+            for _ in 0..entry.skip {
+                out.push(None);
             }
         }
         out
@@ -105,6 +103,24 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
+    let diskmap = DiskMap::parse(input)?;
+
+    // Dual pointer approach
+    let mut l = 0;
+    let mut r = diskmap.entries.len() - 1;
+
+    // Algo:
+    // For entry in entries, considered from behind
+    // Look from start of vector, find entry with skip >= blocks
+
+    // let (first_none_idx, _) = spreaded.iter().find_position(|x| x.is_none())?;
+    // let numbers = spreaded
+    //     .iter()
+    //     .take(first_none_idx)
+    //     .copied()
+    //     .collect::<Option<Vec<u32>>>()?;
+
+    // Some(checksum(numbers))
     None
 }
 
@@ -139,7 +155,9 @@ mod tests {
 
     #[test]
     fn test_checksum() {
-        let numbers = vec![0,0,9,9,8,1,1,1,8,8,8,2,7,7,7,3,3,3,6,4,4,6,5,5,5,5,6,6];
+        let numbers = vec![
+            0, 0, 9, 9, 8, 1, 1, 1, 8, 8, 8, 2, 7, 7, 7, 3, 3, 3, 6, 4, 4, 6, 5, 5, 5, 5, 6, 6,
+        ];
         assert_eq!(1928, checksum(numbers))
     }
 
