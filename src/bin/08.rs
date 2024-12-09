@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use itertools::Itertools;
 
 advent_of_code::solution!(8);
@@ -24,7 +26,7 @@ impl Node {
 }
 
 fn is_within_bounds(pos: (i32, i32), rows: i32, cols: i32) -> bool {
-    return (0 <= pos.0) && (pos.0 < rows) && (0 < pos.1) && (pos.1 < cols);
+    return (0 <= pos.0) && (pos.0 < rows) && (0 <= pos.1) && (pos.1 < cols);
 }
 
 fn pos_as_i32(pos: (usize, usize)) -> (i32, i32) {
@@ -40,8 +42,9 @@ fn antinode_positions(
     let p1 = pos_as_i32(pos1);
     let p2 = pos_as_i32(pos2);
 
-    let candidate_1 = (p1.0 - p2.0, p1.1 - p2.1);
-    let candidate_2 = (p2.0 - p1.0, p2.1 - p1.1);
+    // x_1 = 5, x_2 = 3 => x_anti_1 = 5 - 2*(5-3)
+    let candidate_1 = (p1.0 - 2 * (p1.0 - p2.0), p1.1 - 2 * (p1.1 - p2.1));
+    let candidate_2 = (p2.0 - 2 * (p2.0 - p1.0), p2.1 - 2 * (p2.1 - p1.1));
 
     vec![candidate_1, candidate_2]
         .iter()
@@ -51,6 +54,8 @@ fn antinode_positions(
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
+    println!("{}", input);
+
     // Find the size of the board
     let rows = input.lines().collect_vec().len() as i32;
     let cols = input.lines().nth(0).map(|x| x.len())? as i32;
@@ -59,26 +64,31 @@ pub fn part_one(input: &str) -> Option<u32> {
     let nodes = Node::parse_all(input);
 
     // Find all potential antinodes
-    let node_groups: Vec<(usize, usize)> = nodes.chunk_by(|a, b| a.c == b.c).flat_map(|group| {
-        let group_vec = group.to_vec();
-        let combinations: Vec<(Node, Node)> = group_vec
-            .iter()
-            .tuple_combinations::<(_, _)>()
-            .map(move |(a, b)| (*a, *b))
-            .collect();
-        combinations
-            .iter()
-            .map(|(a, b)| antinode_positions(a.pos, b.pos, rows, cols))
-            .collect::<Vec<_>>()
-    }).collect();
-
-    // Filter by antinodes within the size of the boards
+    let antinodes: Vec<(usize, usize)> = nodes
+        .iter()
+        .into_group_map_by(|x| x.c)
+        .values()
+        .flat_map(|group| -> Vec<(usize, usize)> {
+            let combinations: Vec<(Node, Node)> = group
+                .iter()
+                .tuple_combinations::<(_, _)>()
+                .map(|(a, b)| (**a, **b))
+                .collect();
+            let group_antinode_positions = combinations
+                .iter()
+                .flat_map(|(a, b)| antinode_positions(a.pos, b.pos, rows, cols))
+                .collect::<Vec<(usize, usize)>>();
+            group_antinode_positions
+        })
+        .collect();
 
     // Create hashset of all positions
+    let positions: HashSet<(usize, usize)> = antinodes.into_iter().collect();
 
     // Get count of elements in hashset
+    let count = positions.into_iter().count();
 
-    None
+    Some(count as u32)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
