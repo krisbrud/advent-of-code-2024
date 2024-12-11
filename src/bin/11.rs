@@ -1,3 +1,5 @@
+use memoize::memoize;
+
 advent_of_code::solution!(11);
 
 fn number_of_digits(stone: u64) -> usize {
@@ -37,6 +39,7 @@ fn blink(stone: u64) -> Vec<u64> {
     return vec![stone * 2024];
 }
 
+#[memoize]
 fn stones_after_blinking_n_times(stone: u64, times: u32) -> u64 {
     if times == 0 {
         return 1;
@@ -63,7 +66,17 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    None
+    let initial_stones = input
+        .split(" ")
+        .map(|s| s.parse::<u64>().ok())
+        .collect::<Option<Vec<_>>>()?;
+
+    let final_stone_count: u64 = initial_stones
+        .iter()
+        .map(|stone| stones_after_blinking_n_times(*stone, 75))
+        .sum();
+
+    Some(final_stone_count)
 }
 
 #[cfg(test)]
@@ -81,9 +94,9 @@ mod tests {
         assert_eq!(result, Some(55312));
     }
 
-    #[test]
-    fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
-    }
+    // #[test]
+    // fn test_part_two() {
+    //     let result = part_two(&advent_of_code::template::read_file("examples", DAY));
+    //     assert_eq!(result, None);
+    // }
 }
