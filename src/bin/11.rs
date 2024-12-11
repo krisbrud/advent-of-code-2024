@@ -6,10 +6,6 @@ fn number_of_digits(stone: u64) -> usize {
     (stone.checked_ilog10().unwrap_or(0) + 1) as usize
 }
 
-fn has_even_number_of_digits(stone: u64) -> bool {
-    return (number_of_digits(stone) % 2) == 0;
-}
-
 fn split_stone(stone: u64) -> Vec<u64> {
     let x = 10u64.pow((number_of_digits(stone) / 2) as u32);
 
