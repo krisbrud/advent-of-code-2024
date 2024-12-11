@@ -1,5 +1,4 @@
-use core::num;
-use std::mem::swap;
+use std::collections::VecDeque;
 
 use itertools::Itertools;
 
@@ -25,6 +24,11 @@ impl DiskMapEntry {
             _ => None,
         }
     }
+}
+
+struct IdentifiedEntry {
+    id: usize,
+    entry: DiskMapEntry
 }
 
 #[derive(Clone)]
@@ -105,13 +109,27 @@ pub fn part_one(input: &str) -> Option<u64> {
 pub fn part_two(input: &str) -> Option<u32> {
     let diskmap = DiskMap::parse(input)?;
 
-    // Dual pointer approach
-    let mut l = 0;
-    let mut r = diskmap.entries.len() - 1;
+    let mut entries = diskmap
+        .entries
+        .into_iter()
+        .collect::<VecDeque<DiskMapEntry>>();
 
-    // Algo:
-    // For entry in entries, considered from behind
-    // Look from start of vector, find entry with skip >= blocks
+    // Dual pointer approach
+    let mut l: usize = 0;
+    // let mut r = diskmap.entries.len() - 1;
+
+    // Pseudo:
+    // For second in entries, considered from behind
+    // Look for first from start of vector, find entry with first.skip >= second.blocks
+    // then
+    //   remove the entry from (late in) the dequeue
+    //   rest = first.skip - second.blocks
+    //   set first.skip to 0
+    //   Insert the new node after with skip = rest
+    // else
+    //   Do nothing
+
+
 
     // let (first_none_idx, _) = spreaded.iter().find_position(|x| x.is_none())?;
     // let numbers = spreaded
@@ -170,6 +188,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(2858));
     }
 }
