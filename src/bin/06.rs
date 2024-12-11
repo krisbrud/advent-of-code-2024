@@ -1,9 +1,5 @@
 use itertools::Itertools;
-use std::{
-    borrow::{Borrow, BorrowMut},
-    collections::{hash_map::Entry, HashMap},
-    fmt::{self, Display},
-};
+use std::collections::HashMap;
 
 advent_of_code::solution!(6);
 
@@ -13,7 +9,7 @@ struct BoardSize {
     cols: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum Direction {
     North,
     East,
@@ -74,7 +70,8 @@ enum Tile {
     Unvisited,
     Obstruction,
     Guard(Direction),
-    Visited,
+    VisitedPart1,            // Direction is where the player left the last time
+    VisitedPart2(Direction), // Direction is where the player left the last time
 }
 
 impl Tile {
@@ -141,7 +138,8 @@ impl Board {
                         Direction::South => 'V',
                         Direction::West => '<',
                     },
-                    Tile::Visited => 'X',
+                    Tile::VisitedPart1 => 'X',
+                    Tile::VisitedPart2(_) => 'Q',
                 };
                 print!("{}", char);
             }
@@ -150,7 +148,7 @@ impl Board {
     }
 }
 
-fn step(tiles: &mut HashMap<(usize, usize), Tile>, size: &BoardSize) -> bool {
+fn step_part_1(tiles: &mut HashMap<(usize, usize), Tile>, size: &BoardSize) -> bool {
     // let (guard_pos, guard_tile) = tiles.iter().find(|(pos, tile)| {
     let (guard_pos, guard_tile) = tiles
         .iter()
@@ -158,7 +156,7 @@ fn step(tiles: &mut HashMap<(usize, usize), Tile>, size: &BoardSize) -> bool {
         .map(|(pos, tile)| (*pos, tile.clone()))
         .unwrap();
 
-    tiles.insert(guard_pos, Tile::Visited);
+    tiles.insert(guard_pos, Tile::VisitedPart1);
 
     let guard_direction = match guard_tile.clone() {
         Tile::Guard(direction) => direction,
@@ -168,12 +166,8 @@ fn step(tiles: &mut HashMap<(usize, usize), Tile>, size: &BoardSize) -> bool {
     if let Some(pos_in_front) = pos_in_direction(guard_pos, &guard_direction, size) {
         if let Some(tile_in_front) = tiles.get(&pos_in_front) {
             match tile_in_front {
-                Tile::Unvisited | Tile::Visited => {
+                Tile::Unvisited | Tile::VisitedPart1 => {
                     // Set tile in front as guard with same direction
-                    // println!(
-                    //     "Straight ahead: pos_in_front {:?}, guard_tile {:?}",
-                    //     pos_in_front, guard_tile
-                    // );
                     tiles.insert(pos_in_front, guard_tile);
                     return false;
                 }
@@ -182,20 +176,16 @@ fn step(tiles: &mut HashMap<(usize, usize), Tile>, size: &BoardSize) -> bool {
                     if let Some(turned_pos) = pos_in_direction(guard_pos, &turned_direction, &size)
                     {
                         tiles.insert(turned_pos, Tile::Guard(turned_direction.clone()));
-                        // println!(
-                        //     "Turning right! turned_pos: {:?} turned_direction: {:?}",
-                        //     turned_pos, turned_direction
-                        // );
                         return false;
                     } else {
                         // Outside of board
-                        // println!("Outside of board after turning!");
                         return true;
                     }
                 }
                 Tile::Guard(_) => {
                     panic!("should not have more than one guard")
                 }
+                Tile::VisitedPart2(_) => panic!("Should not find these"),
             }
         } else {
             panic!("should always find tile")
@@ -206,27 +196,115 @@ fn step(tiles: &mut HashMap<(usize, usize), Tile>, size: &BoardSize) -> bool {
     }
 }
 
+fn loops(tiles: &HashMap<(usize, usize), Tile>, size: &BoardSize, has_branched: bool) -> u32 {
+    // let (guard_pos, guard_tile) = tiles.iter().find(|(pos, tile)| {
+    let (guard_pos, guard_tile) = tiles
+        .iter()
+        .find(|(_, tile)| matches!(tile, Tile::Guard(_)))
+        .map(|(pos, tile)| (*pos, tile.clone()))
+        .unwrap();
+
+    // tiles.insert(guard_pos, Tile::VisitedPart2());
+
+    let guard_direction = match guard_tile.clone() {
+        Tile::Guard(direction) => direction,
+        _ => panic!("Guard tile should always be guard"),
+    };
+
+    // let non_branching_loops: u32 = if let Some(pos_in_front) =
+    let non_branching_loops: u32 = if let Some(pos_in_front) =
+        pos_in_direction(guard_pos, &guard_direction, size)
+    {
+        let mut next_tiles = tiles.clone();
+        next_tiles.insert(guard_pos, Tile::VisitedPart2(guard_direction.clone()));
+        if let Some(tile_in_front) = tiles.get(&pos_in_front) {
+            match tile_in_front {
+                Tile::Unvisited => {
+                    // Set tile in front as guard with same direction
+                    next_tiles.insert(pos_in_front, guard_tile);
+                    loops(&next_tiles, size, has_branched)
+                }
+                Tile::VisitedPart2(prev_direction) => {
+                    if guard_direction == *prev_direction {
+                        // Found a loop!
+                        return 1;
+                    }
+                    next_tiles.insert(pos_in_front, guard_tile);
+                    loops(&next_tiles, size, has_branched)
+                }
+                Tile::Obstruction => {
+                    let turned_direction = guard_direction.turn_right();
+                    if let Some(turned_pos) = pos_in_direction(guard_pos, &turned_direction, &size)
+                    {
+                        next_tiles.insert(turned_pos, Tile::Guard(turned_direction.clone()));
+                        loops(&next_tiles, size, has_branched)
+                    } else {
+                        // Outside of board
+                        0
+                    }
+                }
+                Tile::Guard(_) => {
+                    panic!("should not have more than one guard")
+                }
+                Tile::VisitedPart1 => panic!("Shouldn't find part1 visited"),
+            }
+        } else {
+            panic!("should always find tile")
+        }
+    } else {
+        0
+    };
+
+    let branching_loops: u32 = if !has_branched {
+        if let Some(pos_in_front) = pos_in_direction(guard_pos, &guard_direction, size) {
+            if let Some(tile_in_front) = tiles.get(&pos_in_front) {
+                match tile_in_front {
+                    Tile::Obstruction => 0,
+                    _ => {
+                        let mut cloned_tiles = tiles.clone();
+
+                        // Set tile in front as obstruction
+                        cloned_tiles.insert(pos_in_front, Tile::Obstruction);
+                        loops(&cloned_tiles, size, true)
+                    }
+                }
+            } else {
+                // No tile in front, no loops
+                0
+            }
+        } else {
+            // No tile in front, no loops
+            0
+        }
+    } else {
+        // Shouldn't consider loops if already branched
+        0
+    };
+
+    return branching_loops + non_branching_loops;
+}
+
 pub fn part_one(input: &str) -> Option<u32> {
     let board = Board::parse(input)?;
     let size = board.size.clone();
     let mut tiles = board.tiles.clone();
 
     let mut finished = false;
-    let max_steps = 100000;
+    let max_steps = 5000;
 
     let mut steps = 0;
     while !finished && steps < max_steps {
         // println!("{}", steps);
         // let cloned_tiles = tiles.clone();
         // Board::print(&Board { tiles: cloned_tiles, size });
-        finished = step(&mut tiles, &size);
+        finished = step_part_1(&mut tiles, &size);
         steps += 1;
     }
 
     let count: u32 = tiles
         .clone()
         .iter()
-        .filter(|(_, tile)| matches!(tile, Tile::Visited))
+        .filter(|(_, tile)| matches!(tile, Tile::VisitedPart1))
         .count()
         .try_into()
         .unwrap();
@@ -239,27 +317,9 @@ pub fn part_two(input: &str) -> Option<u32> {
     let size = board.size.clone();
     let mut tiles = board.tiles.clone();
 
-    let mut finished = false;
-    let max_steps = 100000;
+    let loop_count = loops(&tiles, &size, false);
 
-    let mut steps = 0;
-    while !finished && steps < max_steps {
-        // println!("{}", steps);
-        // let cloned_tiles = tiles.clone();
-        // Board::print(&Board { tiles: cloned_tiles, size });
-        finished = step(&mut tiles, &size);
-        steps += 1;
-    }
-
-    let count: u32 = tiles
-        .clone()
-        .iter()
-        .filter(|(_, tile)| matches!(tile, Tile::Visited))
-        .count()
-        .try_into()
-        .unwrap();
-
-    Some(count)
+    Some(loop_count)
 }
 
 #[cfg(test)]
