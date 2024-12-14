@@ -1,5 +1,5 @@
 use core::num;
-use std::collections::HashSet;
+use std::{collections::HashSet, vec};
 
 use itertools::Itertools;
 
@@ -11,6 +11,14 @@ struct Farm {
     plants: Vec<Vec<char>>,
     rows: usize,
     cols: usize,
+}
+
+#[derive(PartialEq)]
+enum Direction {
+    North,
+    East,
+    South,
+    West,
 }
 
 impl Farm {
@@ -116,7 +124,81 @@ fn perimeter(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
         .sum()
 }
 
-fn price(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
+fn plant_side_pieces(
+    region: &HashSet<Coordinate>,
+    coordinate: &Coordinate,
+    rows: usize,
+    cols: usize,
+) -> Vec<(Coordinate, Direction)> {
+    let mut side_pieces: Vec<(Coordinate, Direction)> = vec![];
+    if coordinate.0 == 0 {
+        side_pieces.push((coordinate.clone(), Direction::North))
+    } else {
+        if region.get(&(coordinate.0 - 1, coordinate.1)).is_some() {
+            side_pieces.push((coordinate.clone(), Direction::North))
+        }
+    }
+    if coordinate.1 == rows - 1 {
+        side_pieces.push((coordinate.clone(), Direction::South))
+    } else {
+        if region.get(&(coordinate.0 + 1, coordinate.1)).is_some() {
+            side_pieces.push((coordinate.clone(), Direction::South))
+        }
+    }
+    if coordinate.1 == 0 {
+        side_pieces.push((coordinate.clone(), Direction::West))
+    } else {
+        if region.get(&(coordinate.0, coordinate.1 - 1)).is_some() {
+            side_pieces.push((coordinate.clone(), Direction::West))
+        }
+    }
+    if coordinate.1 == cols - 1 {
+        side_pieces.push((coordinate.clone(), Direction::East))
+    } else {
+        if region.get(&(coordinate.0, coordinate.1 + 1)).is_some() {
+            side_pieces.push((coordinate.clone(), Direction::East))
+        }
+    }
+
+    side_pieces
+}
+
+fn region_side_pieces(
+    region: &HashSet<Coordinate>,
+    rows: usize,
+    cols: usize,
+) -> Vec<(Coordinate, Direction)> {
+    region
+        .into_iter()
+        .flat_map(|coordinate| plant_side_pieces(region, coordinate, rows, cols))
+        .collect()
+}
+
+fn region_sides(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
+    let side_pieces = region_side_pieces(region, rows, cols);
+
+    let north_pieces = side_pieces
+        .iter()
+        .filter(|(_, dir)| dir == &Direction::North);
+
+    let south_pieces = side_pieces
+        .iter()
+        .filter(|(_, dir)| dir == &Direction::South);
+    let east_pieces = side_pieces
+        .iter()
+        .filter(|(_, dir)| dir == &Direction::East);
+    let west_pieces = side_pieces
+        .iter()
+        .filter(|(_, dir)| dir == &Direction::West);
+
+    0
+}
+
+fn price_part_2(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
+    area(region) * perimeter(region, rows, cols)
+}
+
+fn price_part_1(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
     area(region) * perimeter(region, rows, cols)
 }
 
@@ -126,13 +208,24 @@ pub fn part_one(input: &str) -> Option<u32> {
 
     let total_price: u32 = regions
         .iter()
-        .map(|region| price(region, farm.rows, farm.cols))
+        .map(|region| price_part_1(region, farm.rows, farm.cols))
         .sum();
 
     Some(total_price)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
+    // The price is now for the number of sides per region instead of the perimeter.
+    // We can change the perimeter code to instead of taking 4 - the available sides,
+    // it should return the positions and directions in which there is no neighbor in the same region.
+    // We will then have sequences of tuples (coordinate, direction).
+    // This should be split up in sides according to the rules:
+    // A west/east side must have the same col coordinate and contiguous row coordinates
+    // A north/south side must have the same row coordinate and contiguous col coordinates
+
+    let farm = Farm::new(input)?;
+    let regions = find_regions(&farm);
+
     None
 }
 
@@ -153,20 +246,25 @@ mod tests {
 
     #[test]
     fn test_part_one_first_example() {
-        let result = part_one(&advent_of_code::template::read_file_part("examples", DAY,1 ));
+        let result = part_one(&advent_of_code::template::read_file_part(
+            "examples", DAY, 1,
+        ));
         assert_eq!(result, Some(140));
     }
 
     #[test]
     fn test_part_one_second_example() {
-        let result = part_one(&advent_of_code::template::read_file_part("examples", DAY, 2));
+        let result = part_one(&advent_of_code::template::read_file_part(
+            "examples", DAY, 2,
+        ));
         assert_eq!(result, Some(772));
     }
 
-
     #[test]
     fn test_part_one_third_example() {
-        let result = part_one(&advent_of_code::template::read_file_part("examples", DAY, 3));
+        let result = part_one(&advent_of_code::template::read_file_part(
+            "examples", DAY, 3,
+        ));
         assert_eq!(result, Some(1930));
     }
 
