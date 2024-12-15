@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashSet, fs};
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -17,9 +17,9 @@ struct Robot {
 }
 
 lazy_static! {
-    static ref regex_pattern: Regex = Regex::new(r"p=([-\d]+),([-\d]+) v=([-\d]+),([-\d]+)").unwrap();
+    static ref regex_pattern: Regex =
+        Regex::new(r"p=([-\d]+),([-\d]+) v=([-\d]+),([-\d]+)").unwrap();
 }
-
 
 impl Robot {
     fn new(s: &str) -> Option<Robot> {
@@ -51,8 +51,10 @@ fn simulate(initial_pos: Position, vel: Velocity, steps: i64, rows: i64, cols: i
 }
 
 pub fn part_one(input: &str) -> Option<usize> {
-    // let robots = input.lines().map(Robot::new).collect::<Option<Vec<_>>>()?;
-    let robots = input.lines().map(|s| Robot::new(s)).collect::<Option<Vec<_>>>()?;
+    let robots = input
+        .lines()
+        .map(|s| Robot::new(s))
+        .collect::<Option<Vec<_>>>()?;
 
     let board_size: BoardSize = if robots.len() == 500 {
         (103, 101) // Input
@@ -64,7 +66,8 @@ pub fn part_one(input: &str) -> Option<usize> {
 
     let final_positions: Vec<Position> = robots
         .iter()
-        .map(|robot| simulate(robot.pos, robot.vel, steps, board_size.0, board_size.1)).collect();
+        .map(|robot| simulate(robot.pos, robot.vel, steps, board_size.0, board_size.1))
+        .collect();
 
     println!("Final positions: {:?}", final_positions);
 
@@ -72,7 +75,8 @@ pub fn part_one(input: &str) -> Option<usize> {
     let middle_col = board_size.1 / 2;
 
     // Remove robots in the middle
-    let filtered = final_positions.iter()
+    let filtered = final_positions
+        .iter()
         .filter(|pos| pos.0 != middle_row)
         .filter(|pos| pos.1 != middle_col);
 
@@ -80,9 +84,10 @@ pub fn part_one(input: &str) -> Option<usize> {
 
     let robots_per_quadrant = filtered
         .into_grouping_map_by(|pos| ((pos.0 > middle_row), (pos.1 > middle_col)))
-        .fold(0, |acc, _, _| {
-            acc + 1
-        }).values().copied().collect::<Vec<usize>>();
+        .fold(0, |acc, _, _| acc + 1)
+        .values()
+        .copied()
+        .collect::<Vec<usize>>();
 
     println!("Robots per quadrant: {:?}", robots_per_quadrant);
 
@@ -92,7 +97,54 @@ pub fn part_one(input: &str) -> Option<usize> {
     // None
 }
 
+fn board_string(positions: &Vec<Position>, board_size: BoardSize) -> String {
+    let occupied: HashSet<Position> = positions.clone().into_iter().collect();
+
+    let mut out: String = String::new();
+    for row in 0..board_size.0 {
+        for col in 0..board_size.1 {
+            if occupied.contains(&(row, col)) {
+                out.push('#');
+            } else {
+                out.push(' ');
+            }
+        }
+        out.push('\n');
+    }
+
+    out
+}
+
 pub fn part_two(input: &str) -> Option<u32> {
+    let robots = input
+        .lines()
+        .map(|s| Robot::new(s))
+        .collect::<Option<Vec<_>>>()?;
+
+    let board_size: BoardSize = if robots.len() == 500 {
+        (103, 101) // Input
+    } else {
+        (7, 11) // Example
+    };
+
+    // let out_file_name = "data/outputs/day14.txt";
+
+    for step in 5000..10000 {
+        let final_positions: Vec<Position> = robots
+            .iter()
+            .map(|robot| simulate(robot.pos, robot.vel, step, board_size.0, board_size.1))
+            .collect();
+
+        let readable_board = board_string(&final_positions, board_size);
+
+        println!("Step {}", step);
+        println!("{}", readable_board);
+
+        // fs::write(out_file_name, format!("Step {}", step)).ok()?;
+        // fs::write(out_file_name, readable_board).ok()?;
+        // fs::write(out_file_name, "\n").ok()?;
+    }
+
     None
 }
 
@@ -115,16 +167,19 @@ mod tests {
     #[test]
     fn test_simulate() {
         let actual = simulate((4, 2), (-3, 2), 5, 7, 11);
-        let expected = (3,1);
+        let expected = (3, 1);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_parse_all() {
         let input = advent_of_code::template::read_file("examples", DAY);
-        input.lines().map(|s| Robot::new(s)).collect::<Option<Vec<_>>>().unwrap();
+        input
+            .lines()
+            .map(|s| Robot::new(s))
+            .collect::<Option<Vec<_>>>()
+            .unwrap();
     }
-
 
     #[test]
     fn test_part_one() {
