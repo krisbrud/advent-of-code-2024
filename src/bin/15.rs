@@ -34,7 +34,7 @@ impl Board {
         self.set(second, temp)
     }
 
-    fn print(&self) {
+    fn as_string(&self) -> String {
         let mut out: String = String::new();
         for row in 0..self.rows {
             for col in 0..self.cols {
@@ -43,45 +43,27 @@ impl Board {
             out.push('\n');
         }
 
-        println!("{}", out);
+        out
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let mut board = Board::new(input.split("\n\n").nth(0)?)?;
-    let directions = input.split("\n\n").nth(1)?;
-
-    let mut agent_pos = find_agent_or_fail(&board);
-
-    for direction_char in directions.lines().flat_map(|line| line.chars()) {
-        // println!("Direction char: {}, agent_pos: {:?}", direction_char, agent_pos);
-        // board.print();
-        let direction = Direction::new(direction_char).expect("Should parse direction");
-        agent_pos = step(&mut board, agent_pos, direction);
-    }
-
-    // Find sum of "GPS-coordinates"
-    let gps_coordinate_sum: usize =
-        board
-            .tiles
-            .iter()
-            .enumerate()
-            .flat_map(|(row, row_tiles)| {
-                row_tiles.into_iter().enumerate().map(move |(col, char)| {
-                    if *char == 'O' {
-                        (100 * row) + col
-                    } else {
-                        0
-                    }
-                })
-            })
-            .sum();
-
-    Some(gps_coordinate_sum.try_into().expect("Should convert"))
-}
-
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+/** Preprocess the string.
+If the tile is #, the new map contains ## instead.
+If the tile is O, the new map contains [] instead.
+If the tile is ., the new map contains .. instead.
+If the tile is @, the new map contains @. instead.
+ */
+fn preprocess(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '#' => "##",
+            'O' => "[]",
+            '.' => "..",
+            '@' => "@.",
+            '\n' => "\n",
+            _ => panic!("Unexpected char in preprocess!"),
+        })
+        .collect()
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -123,17 +105,17 @@ How to simulate a step:
         -> Do nothing, done
     b: It is just air ('.')
         -> Move the agent there (swap agent and air chars)
-    c: It has a boulder ('O')
+    c: It has a box ('O')
         -> Check the next in that direction
-            - It is still a boulder -> Keep going
+            - It is still a box -> Keep going
             - It is a wall -> No move can be made, do nothing, done
-            - It is air -> Want to move all the boulders.
+            - It is air -> Want to move all the box.
                 But this is a bit cumbersome, so it is better to
-                1. Swap the boulder and the air
+                1. Swap the box and the air
                 2. Swap the air and the robot
  */
 
-fn first_non_boulder_in_direction(
+fn first_non_box_in_direction(
     board: &Board,
     coord: Coordinate,
     direction: Direction,
@@ -143,7 +125,7 @@ fn first_non_boulder_in_direction(
     let next_tile = board.get(&next_coord);
     match next_tile {
         '.' | '#' => (next_coord, next_tile),
-        'O' => first_non_boulder_in_direction(board, next_coord, direction),
+        'O' => first_non_box_in_direction(board, next_coord, direction),
         _ => panic!(
             "Finding first non-boulder - unexpected tile {} at coordinate {:?}",
             next_tile, next_coord
@@ -163,9 +145,9 @@ fn step(board: &mut Board, agent_pos: Coordinate, direction: Direction) -> Coord
             }
             'O' => {
                 let (end_coord, end_tile) =
-                    first_non_boulder_in_direction(board, front_coord, direction);
+                    first_non_box_in_direction(board, front_coord, direction);
                 if end_tile == '.' {
-                    board.swap(&front_coord, &end_coord); // Swap boulder and air
+                    board.swap(&front_coord, &end_coord); // Swap box and air
                     board.swap(&agent_pos, &front_coord); // Swap agent and air
                     return front_coord;
                 } else if end_tile == '#' {
@@ -195,6 +177,112 @@ fn find_agent_or_fail(board: &Board) -> (usize, usize) {
     panic!("Failed to find agent")
 }
 
+pub fn part_one(input: &str) -> Option<u32> {
+    let mut board = Board::new(input.split("\n\n").nth(0)?)?;
+    let directions = input.split("\n\n").nth(1)?;
+
+    let mut agent_pos = find_agent_or_fail(&board);
+
+    for direction_char in directions.lines().flat_map(|line| line.chars()) {
+        // println!("Direction char: {}, agent_pos: {:?}", direction_char, agent_pos);
+        // board.print();
+        let direction = Direction::new(direction_char).expect("Should parse direction");
+        agent_pos = step(&mut board, agent_pos, direction);
+    }
+
+    // Find sum of "GPS-coordinates"
+    let gps_coordinate_sum: usize =
+        board
+            .tiles
+            .iter()
+            .enumerate()
+            .flat_map(|(row, row_tiles)| {
+                row_tiles.into_iter().enumerate().map(move |(col, char)| {
+                    if *char == 'O' {
+                        (100 * row) + col
+                    } else {
+                        0
+                    }
+                })
+            })
+            .sum();
+
+    Some(gps_coordinate_sum.try_into().expect("Should convert"))
+}
+
+/**
+TODO:
+
+Preprocess the board - DONE
+
+A box is pushable if in a direction if the coordinates it will be pushed to
+- Are air
+- Are pushable boxes
+
+Before we can execute a push, we need
+- Left coordinate of all boxes (use this to calculate right coord)
+- Direction
+
+Executing a push:
+- Copy all the left-hand-side box coordinates
+- Also, find all the rhs coordinates
+- Move the coordinates in direction and write
+*/
+
+fn get_rhs_coord(lhs_coord: Coordinate) -> Coordinate {
+    coordinate_in_direction(lhs_coord, Direction::East).expect("Should find coordinate to the east")
+}
+
+fn pushable_boxes_in_direction(
+    board: &Board,
+    lhs_coord: Coordinate,
+    direction: Direction,
+) -> (Vec<Coordinate>, bool) {
+    let rhs_coord = get_rhs_coord(lhs_coord);
+    let next_coords = match direction {
+        Direction::East => {
+            vec![coordinate_in_direction(rhs_coord, direction).unwrap()]
+        }
+        Direction::West => {
+            vec![coordinate_in_direction(lhs_coord, direction).unwrap()]
+        }
+        Direction::North | Direction::South => {
+            vec![
+                coordinate_in_direction(lhs_coord, direction).unwrap(),
+                coordinate_in_direction(rhs_coord, direction).unwrap(),
+            ]
+        }
+    };
+
+    let mut next_boxes = vec![];
+    for next_coord in next_coords {
+        let next_tile = board.get(&next_coord);
+        match next_tile {
+            '[' => {
+                let (boxes, pushable) = pushable_boxes_in_direction(board, next_coord, direction);
+                if !pushable {
+                    return (vec![], false)
+                }
+            },
+            ']' => todo!(),
+            '.' => {
+                // Do nothing
+            },
+            '#' => todo!(),
+            _ => panic!("Unexpected tile when finding pushable boxes")
+        }
+    }
+
+    (next_boxes, true)
+}
+
+pub fn part_two(input: &str) -> Option<u32> {
+    let mut board = Board::new(&preprocess(input.split("\n\n").nth(0)?))?;
+    let directions = input.split("\n\n").nth(1)?;
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,5 +309,18 @@ mod tests {
             "examples", DAY, 1,
         ));
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_preprocess() {
+        let expected = advent_of_code::template::read_file_part("examples", DAY, 3);
+
+        let actual = preprocess(
+            advent_of_code::template::read_file_part("examples", DAY, 1)
+                .split("\n\n")
+                .nth(0)
+                .unwrap(),
+        );
+        assert_eq!(expected, actual);
     }
 }
