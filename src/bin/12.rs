@@ -64,7 +64,6 @@ fn neighbors_in_same_region(farm: &Farm, coordinate: &Coordinate) -> Vec<Coordin
 }
 
 fn find_regions(farm: &Farm) -> Vec<HashSet<Coordinate>> {
-    println!("Start of find regions");
     // General idea:
     // Make a set of all the possible coordinates
     let mut remaining_coordinates: HashSet<Coordinate> = (0..farm.rows)
@@ -138,7 +137,7 @@ fn plant_side_pieces(
             side_pieces.push((coordinate.clone(), Direction::North))
         }
     }
-    if coordinate.1 == rows - 1 {
+    if coordinate.0 == rows - 1 {
         side_pieces.push((coordinate.clone(), Direction::South))
     } else {
         if region.get(&(coordinate.0 + 1, coordinate.1)).is_none() {
@@ -226,7 +225,6 @@ fn sides_vertically(side_pieces: Vec<Coordinate>) -> u32 {
 
 fn region_sides(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
     let side_pieces = region_side_pieces(region, rows, cols);
-    println!("region_sides region {:?}, side_pieces: {:?}, num side pieces: {}", region, side_pieces, side_pieces.len());
 
     let north_pieces = side_pieces
         .iter()
@@ -252,7 +250,7 @@ fn region_sides(region: &HashSet<Coordinate>, rows: usize, cols: usize) -> u32 {
     let north_sides = sides_horizontally(north_pieces);
     let south_sides = sides_horizontally(south_pieces);
     let west_sides = sides_vertically(west_pieces);
-    let east_sides = sides_horizontally(east_pieces);
+    let east_sides = sides_vertically(east_pieces);
 
     north_sides + south_sides + west_sides + east_sides
 }
@@ -348,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn test_part_two_first_example() {
+    fn test_part_two_1() {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 1,
         ));
@@ -356,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    fn test_part_two_second_example() {
+    fn test_part_two_2() {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 2,
         ));
@@ -364,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_part_two_third_example() {
+    fn test_part_two_3() {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 3,
         ));
@@ -372,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn test_part_two_fourth_example() {
+    fn test_part_two_4() {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 4,
         ));
@@ -380,7 +378,7 @@ mod tests {
     }
 
     #[test]
-    fn test_part_two_fifth_example() {
+    fn test_part_two_5() {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 5,
         ));
