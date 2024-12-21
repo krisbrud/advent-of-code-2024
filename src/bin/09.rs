@@ -4,10 +4,10 @@ use itertools::Itertools;
 
 advent_of_code::solution!(9);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DiskMapEntry {
-    blocks: u8,
-    skip: u8,
+    blocks: u64,
+    skip: u64,
 }
 
 impl DiskMapEntry {
@@ -26,9 +26,10 @@ impl DiskMapEntry {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct IdentifiedEntry {
     id: usize,
-    entry: DiskMapEntry
+    entry: DiskMapEntry,
 }
 
 #[derive(Clone)]
@@ -66,6 +67,21 @@ impl DiskMap {
     }
 }
 
+fn spread_part_2(id_entries: &VecDeque<IdentifiedEntry>) -> Vec<Option<u64>> {
+    let mut out: Vec<Option<u64>> = vec![];
+    for id_entry in id_entries.iter() {
+        for _ in 0..id_entry.entry.blocks {
+            out.push(Some(id_entry.id.try_into().expect("Should convert u32 to u64")));
+        }
+
+        // Last entry will not have skip
+        for _ in 0..id_entry.entry.skip {
+            out.push(None);
+        }
+    }
+    out
+}
+
 fn checksum(numbers: Vec<u32>) -> u64 {
     let out = numbers
         .iter()
@@ -74,6 +90,21 @@ fn checksum(numbers: Vec<u32>) -> u64 {
         .sum();
     out
 }
+
+fn checksum_part_2(numbers: Vec<Option<u64>>) -> u64 {
+    let out = numbers
+        .iter()
+        .enumerate()
+        .map(|(i, x)| {
+            if let Some(id) = x {
+                let pos: u64 = i.try_into().unwrap();
+                pos * id
+            } else { 0 }
+        })
+        .sum();
+    out
+}
+
 
 pub fn part_one(input: &str) -> Option<u64> {
     let diskmap = DiskMap::parse(input)?;
@@ -106,40 +137,90 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(checksum(numbers))
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+fn as_string(vec: &Vec<Option<u64>>) -> String {
+    let mut out: Vec<char> = vec![];
+    for maybe_id in vec {
+        if let Some(id_entry) = maybe_id {
+            let s = id_entry.to_string();
+            for c in s.chars() {
+                out.push(c);
+            }
+        } else {
+            out.push('.');
+        }
+    }
+    out.into_iter().collect()
+}
+
+pub fn part_two(input: &str) -> Option<u64> {
     let diskmap = DiskMap::parse(input)?;
 
-    let mut entries = diskmap
+    let entries = diskmap
         .entries
         .into_iter()
         .collect::<VecDeque<DiskMapEntry>>();
 
-    // Dual pointer approach
-    let mut l: usize = 0;
-    // let mut r = diskmap.entries.len() - 1;
+    let mut identified_entries: VecDeque<IdentifiedEntry> = entries
+        .iter()
+        .enumerate()
+        .map(|(id, entry)| IdentifiedEntry { id, entry: *entry })
+        .collect();
+
+    let num_entries = entries.len();
+
+    // println!("before\n spreaded: {:?}\n", as_string(&spread_part_2(&identified_entries)));
+    for id_to_move in (0..num_entries).rev() {
+        let (mover_idx, mover_identified_entry) = identified_entries
+            .clone()
+            .into_iter()
+            .find_position(|entry| entry.id == id_to_move)
+            .expect("Should find entry to move");
+
+        if let Some((target_idx, (_, target_identified_entry))) =
+            identified_entries.clone().iter().enumerate().find_position(|(i, target_candidate)| {
+                (target_candidate.entry.skip >= mover_identified_entry.entry.blocks) && (*i < mover_idx)
+            })
+        {
+            let mut new_mover = mover_identified_entry.clone();
+            let mut new_target = target_identified_entry.clone();
+
+            let before_target_idx = mover_idx - 1;
+            let mut new_before_target = identified_entries.clone().iter().nth(before_target_idx).expect("Should be entry before").clone();
+            new_before_target.entry.skip += new_mover.entry.blocks + new_mover.entry.skip;
+            identified_entries.remove(before_target_idx);
+            identified_entries.insert(before_target_idx, new_before_target);
+
+            let rest = target_identified_entry.entry.skip - mover_identified_entry.entry.blocks;
+            new_target.entry.skip = 0;
+            new_mover.entry.skip = rest;
+
+            identified_entries.remove(mover_idx); // Note: since target is always to the left, we need to remove this one first
+            identified_entries.remove(target_idx);
+
+            identified_entries.insert(target_idx, new_mover);
+            identified_entries.insert(target_idx, new_target); // Shifts new_mover to the back
+        }
+    }
+
+    let spreaded = spread_part_2(&identified_entries);
+
+    // None
+    Some(checksum_part_2(spreaded))
+
+    // 6363235997198 is too low
 
     // Pseudo:
     // For second in entries, considered from behind
     // Look for first from start of vector, find entry with first.skip >= second.blocks
     // then
-    //   remove the entry from (late in) the dequeue
+    //   remove the entry from the dequeue
     //   rest = first.skip - second.blocks
     //   set first.skip to 0
     //   Insert the new node after with skip = rest
     // else
     //   Do nothing
 
-
-
-    // let (first_none_idx, _) = spreaded.iter().find_position(|x| x.is_none())?;
-    // let numbers = spreaded
-    //     .iter()
-    //     .take(first_none_idx)
-    //     .copied()
-    //     .collect::<Option<Vec<u32>>>()?;
-
     // Some(checksum(numbers))
-    None
 }
 
 #[cfg(test)]

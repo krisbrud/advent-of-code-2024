@@ -233,6 +233,10 @@ fn get_rhs_coord(lhs_coord: Coordinate) -> Coordinate {
     coordinate_in_direction(lhs_coord, Direction::East).expect("Should find coordinate to the east")
 }
 
+fn get_lhs_coord(rhs_coord: Coordinate) -> Coordinate {
+    coordinate_in_direction(rhs_coord, Direction::West).expect("Should find coordinate to the west")
+}
+
 fn pushable_boxes_in_direction(
     board: &Board,
     lhs_coord: Coordinate,
@@ -254,7 +258,7 @@ fn pushable_boxes_in_direction(
         }
     };
 
-    let mut next_boxes = vec![];
+    let mut pushable_boxes = vec![lhs_coord, rhs_coord];
     for next_coord in next_coords {
         let next_tile = board.get(&next_coord);
         match next_tile {
@@ -263,24 +267,140 @@ fn pushable_boxes_in_direction(
                 if !pushable {
                     return (vec![], false)
                 }
+                for b in boxes {
+                    pushable_boxes.push(b);
+                }
             },
-            ']' => todo!(),
+            ']' => {
+                let next_lhs_coord = get_lhs_coord(next_coord);
+                let (boxes, pushable) = pushable_boxes_in_direction(board, next_lhs_coord, direction);
+                if !pushable {
+                    return (vec![], false)
+                }
+                for b in boxes {
+                    pushable_boxes.push(b);
+                }
+            },
             '.' => {
                 // Do nothing
             },
-            '#' => todo!(),
+            '#' => {
+                // Wall. No pushable boxes in direction
+                return (vec![], false)
+            },
             _ => panic!("Unexpected tile when finding pushable boxes")
         }
     }
 
-    (next_boxes, true)
+    (pushable_boxes, true)
+}
+
+// Returns new agent pos
+fn step_part_2(board: &mut Board, agent_pos: Coordinate, direction: Direction) -> Coordinate {
+    if let Some(front_coord) = coordinate_in_direction(agent_pos, direction) {
+        match board.get(&front_coord) {
+            '#' => return agent_pos, // Do nothing
+            '.' => {
+                // Move the agent to the empty air
+                board.swap(&agent_pos, &front_coord);
+                return front_coord;
+            }
+            '[' => {
+                let did_push = try_pushing_boxes(board, direction, front_coord);
+                if did_push {
+                    board.set(&front_coord, '@');
+                    board.set(&agent_pos, '.');
+                    return front_coord;
+                } else {
+                    return agent_pos;
+                }
+            }
+            ']' => {
+                // Same as above, but find the lhs coord first
+                let next_lhs_coord = get_lhs_coord(front_coord);
+                let did_push = try_pushing_boxes(board, direction, next_lhs_coord);
+                if did_push {
+                    board.set(&front_coord, '@');
+                    board.set(&agent_pos, '.');
+                    return front_coord;
+                } else {
+                    return agent_pos;
+                }
+            }
+            '@' => panic!("Unexpected agent!"),
+            _ => panic!("Unknown tile!"),
+        }
+    }
+
+    panic!("Couldn't find coord in direction!");
+}
+
+// Returns whether boxes are pushed or not
+fn try_pushing_boxes(board: &mut Board, direction: Direction, next_lhs_coord: (usize, usize)) -> bool {
+    // Get pushable boxes in direction and pushability
+    let (box_coords, pushable) = pushable_boxes_in_direction(board, next_lhs_coord, direction);
+
+    // dbg!(box_coords.clone(), pushable);
+
+    // If they are pushable
+    if pushable {
+        let current_coords_and_tiles = box_coords.iter().map(|coord| (coord, board.get(coord))).collect_vec();
+        for coord in box_coords.clone() {
+            // Set the coordinates to air
+            board.set(&coord, '.');
+        }
+
+        // Find the new coordinates by pushing them all in the direction
+        let pushed_coords_and_tiles = current_coords_and_tiles.into_iter().map(|((coord), tile)| {
+            let pushed_coord = coordinate_in_direction(*coord, direction).expect("should be able to push box");
+            (pushed_coord, tile)
+        });
+        // Write all the pushed coordinates back to the board
+        for (pushed_coord, pushed_tile) in pushed_coords_and_tiles {
+            board.set(&pushed_coord, pushed_tile)
+        }
+    }
+
+    return pushable
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
     let mut board = Board::new(&preprocess(input.split("\n\n").nth(0)?))?;
     let directions = input.split("\n\n").nth(1)?;
 
-    None
+    // Iteration:
+    //
+    let mut agent_pos = find_agent_or_fail(&board);
+
+    // println!("initial state:\n{}", board.as_string());
+    for direction_char in directions.lines().flat_map(|line| line.chars()) {
+        // println!("Direction char: {}, agent_pos: {:?}", direction_char, agent_pos);
+        // board.print();
+        let direction = Direction::new(direction_char).expect("Should parse direction");
+        agent_pos = step_part_2(&mut board, agent_pos, direction);
+        // println!("move {}:\n{}", direction_char, board.as_string());
+    }
+
+    // // Find sum of "GPS-coordinates"
+    let gps_coordinate_sum: usize =
+        board
+            .tiles
+            .iter()
+            .enumerate()
+            .flat_map(|(row, row_tiles)| {
+                row_tiles.into_iter().enumerate().map(move |(col, char)| {
+                    if *char == '[' {
+                        (100 * row) + col
+                    } else {
+                        0
+                    }
+                })
+            })
+            .sum();
+
+    Some(gps_coordinate_sum.try_into().expect("Should convert"))
+
+    // None
 }
 
 #[cfg(test)]
@@ -304,11 +424,34 @@ mod tests {
     }
 
     #[test]
-    fn test_part_two() {
+    fn test_part_two_1() {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 1,
         ));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(9021));
+    }
+
+
+    #[test]
+    fn test_part_two_4() {
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 4,
+        ));
+/*
+##############
+##...[].##..##
+##...@.[]...##
+##....[]....##
+##..........##
+##..........##
+##############
+
+100 * 1 + 5 = 105
+100 * 2 + 7 = 207
+100 * 3 + 6 = 306
+sum : 618
+ */
+        assert_eq!(result, Some(618));
     }
 
     #[test]
