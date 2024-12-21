@@ -22,6 +22,7 @@ target/
 
 data/inputs/*
 data/outputs/*
+data/sketches/*
 !data/inputs/.keep
 data/puzzles/*
 !data/puzzles/.keep

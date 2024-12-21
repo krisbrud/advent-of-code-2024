@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
+    collections::{BinaryHeap, HashMap, HashSet},
     os::macos::raw::stat,
     usize,
 };
@@ -157,7 +157,7 @@ fn find_needle_or_fail(board: &Board, needle: char) -> Coord {
     panic!("Couldn't find tile!");
 }
 
-fn djikstra_shortest_path(board: Board) -> Option<usize> {
+fn djikstra_shortest_path_part_1(board: Board) -> Option<usize> {
     // dist[node] = current shortest distance from `start` to `node`
     let mut pose_cost: HashMap<Pose, usize> = board
         .tiles
@@ -187,9 +187,7 @@ fn djikstra_shortest_path(board: Board) -> Option<usize> {
         coord: start_coord,
         direction: Direction::East, // Always the case
     };
-    dbg!(start_coord);
     let goal_coord = find_needle_or_fail(&board, GOAL);
-    dbg!(goal_coord);
     let goals: Vec<Pose> = ALL_DIRECTIONS
         .iter()
         .map(|dir| Pose {
@@ -240,57 +238,176 @@ fn djikstra_shortest_path(board: Board) -> Option<usize> {
     None
 }
 
-// Dijkstra's shortest path algorithm.
+fn backtrack_all(
+    costs_and_predecessors: &HashMap<Pose, (usize, Vec<Pose>)>,
+    pose: Pose,
+) -> Vec<Pose> {
+    if let Some((_, predecessors)) = costs_and_predecessors.get(&pose) {
+        let mut out: Vec<Pose> = predecessors
+            .iter()
+            .flat_map(|predecessor| backtrack_all(costs_and_predecessors, *predecessor))
+            .collect();
 
-// Start at `start` and use `dist` to track the current shortest distance
-// to each node. This implementation isn't memory-efficient as it may leave duplicate
-// nodes in the queue. It also uses `usize::MAX` as a sentinel value,
-// for a simpler implementation.
-// fn shortest_path(adj_list: &Vec<Vec<Edge>>, start: usize, goal: usize) -> Option<usize> {
-//     // dist[node] = current shortest distance from `start` to `node`
-//     let mut dist: Vec<_> = (0..adj_list.len()).map(|_| usize::MAX).collect();
+        out.push(pose);
 
-//     let mut heap = BinaryHeap::new();
+        return out;
+    } else {
+        return vec![];
+    }
+}
 
-//     // We're at `start`, with a zero cost
-//     dist[start] = 0;
-//     heap.push(State { cost: 0, position: start });
+fn djikstra_best_seats_part_2(board: Board) -> Option<HashSet<Coord>> {
+    // dist[node] = current shortest distance from `start` to `node`
+    let mut pose_cost_and_predecessors: HashMap<Pose, (usize, Vec<Pose>)> = HashMap::new();
 
-//     // Examine the frontier with lower cost nodes first (min-heap)
-//     while let Some(State { cost, position }) = heap.pop() {
-//         // Alternatively we could have continued to find all shortest paths
-//         if position == goal { return Some(cost); }
+    let mut heap = BinaryHeap::new();
 
-//         // Important as we may have already found a better way
-//         if cost > dist[position] { continue; }
+    let start_coord = find_needle_or_fail(&board, START);
+    let start_pose = Pose {
+        coord: start_coord,
+        direction: Direction::East, // Always the case
+    };
+    let goal_coord = find_needle_or_fail(&board, GOAL);
+    let goals: Vec<Pose> = ALL_DIRECTIONS
+        .iter()
+        .map(|dir| Pose {
+            coord: goal_coord,
+            direction: *dir,
+        })
+        .collect_vec();
 
-//         // For each node we can reach, see if we can find a way with
-//         // a lower cost going through this node
-//         for edge in &adj_list[position] {
-//             let next = State { cost: cost + edge.cost, position: edge.node };
+    // We're at `start`, with a zero cost
+    pose_cost_and_predecessors.insert(start_pose, (0, vec![]));
+    heap.push(State {
+        pose: start_pose,
+        cost: 0,
+    });
 
-//             // If so, add it to the frontier and continue
-//             if next.cost < dist[next.position] {
-//                 heap.push(next);
-//                 // Relaxation, we have now found a better way
-//                 dist[next.position] = next.cost;
-//             }
-//         }
-//     }
+    let mut found_goal = false;
 
-//     // Goal not reachable
-//     None
-// }
+    // Examine the frontier with lower cost nodes first (min-heap)
+    while let Some(State { pose, cost }) = heap.pop() {
+        // dbg!(pose.clone(), cost.clone());
+
+        // Alternatively we could have continued to find all shortest paths
+        if goals.contains(&pose) {
+            // let all_coords = backtrack_all(pose_cost_and_predecessors, goal_coord);
+            // let unique_coords: HashSet<Coord> = all_coords.into_iter().collect();
+            // return Some(unique_coords);
+            println!("found goal");
+
+            found_goal = true;
+
+            continue;
+        }
+
+        // Important as we may have already found a better way
+        let (pose_cost, _) = pose_cost_and_predecessors[&pose];
+        if cost > pose_cost {
+            continue;
+        }
+
+        // For each node we can reach, see if we can find a way with
+        // a lower cost going through this node
+        for (adj_pose, additional_cost) in adjacent_poses_and_additional_costs(&board, &pose) {
+            let next = State {
+                pose: adj_pose,
+                cost: cost + additional_cost,
+            };
+
+            // When exploring a new tile - insert into the hashmap
+            // When exploring a previous tile:
+            //   if the cost is better than the previous best, make a new vec with the pose and the cost
+            //   if the cost is the same -> append the pose and cost
+
+            // let (adj_pose_curr_best_cost, adj_pose_predecessors) =
+            if let Some((adj_pose_curr_best_cost, adj_pose_predecessors)) =
+                pose_cost_and_predecessors.get(&adj_pose)
+            {
+                if next.cost == *adj_pose_curr_best_cost {
+                    // Append and insert
+                    let mut new_adj_pose_predecessors = adj_pose_predecessors.clone();
+                    new_adj_pose_predecessors.push(pose);
+                    pose_cost_and_predecessors.insert(
+                        adj_pose,
+                        (next.cost, new_adj_pose_predecessors),
+                    );
+
+                    // No need to explore again by pushing to heap
+                } else if next.cost < *adj_pose_curr_best_cost {
+                    heap.push(next);
+                    // Relaxation, we have now found a better way
+                    pose_cost_and_predecessors.insert(next.pose, (next.cost, vec![pose]));
+                }
+            } else {
+                heap.push(next);
+                // Relaxation, we have now found a better way
+                pose_cost_and_predecessors.insert(next.pose, (next.cost, vec![pose]));
+            }
+        }
+    }
+
+    if found_goal {
+        let mut best_cost = usize::MAX;
+        for direction in ALL_DIRECTIONS {
+            if let Some(tup) = pose_cost_and_predecessors.get(&Pose{ coord: goal_coord, direction: *direction}) {
+                let (cost, _) = tup;
+                if *cost < best_cost {
+                    best_cost = *cost;
+                }
+            }
+        }
+
+        let mut goal_poses: Vec<Pose> = vec![];
+        for direction in ALL_DIRECTIONS {
+            let possible_pose = Pose{ coord: goal_coord, direction: *direction};
+            if let Some(tup) = pose_cost_and_predecessors.get(&possible_pose) {
+                let (cost, _) = tup;
+                if *cost == best_cost {
+                    goal_poses.push(possible_pose);
+                }
+            }
+        }
+
+        let all_poses = goal_poses.iter().flat_map(|p| {
+            backtrack_all(
+                &pose_cost_and_predecessors,
+                *p
+            )
+        });
+        let unique_coords: HashSet<Coord> = all_poses
+            .into_iter()
+            .map(|some_pose| some_pose.coord)
+            .collect();
+        return Some(unique_coords);
+    }
+
+    // Goal not reachable
+    None
+}
 
 pub fn part_one(input: &str) -> Option<u32> {
     let board = Board::new(input).expect("Board should parse!");
 
-    let shortest_path_cost = djikstra_shortest_path(board).expect("Should find shortest path!");
+    let shortest_path_cost =
+        djikstra_shortest_path_part_1(board).expect("Should find shortest path!");
     Some(shortest_path_cost.try_into().ok()?)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    // Idea: Modify implementation from part 1 by
+    // Make a HashMap predecessors from pose to Vec<(prev_pose, cost)>. Use this to mark that a tile is visited with the best cost so far. When doing this we can replace the pose_cost HashMap
+    // When exploring a new tile - insert into the hashmap
+    // When exploring a previous tile:
+    //   if the cost is better than the previous best, make a new vec with the pose and the cost
+    //   if the cost is the same -> append the pose and cost
+    let board = Board::new(input).expect("Board should parse!");
+
+    let unique_coords = djikstra_best_seats_part_2(board).expect("Should find shortest path!");
+    println!("unique coords: {:?}", unique_coords);
+    Some(unique_coords.len().try_into().ok()?)
+
+    // None
 }
 
 #[cfg(test)]
@@ -313,9 +430,19 @@ mod tests {
         assert_eq!(result, Some(11048));
     }
 
-    // #[test]
-    // fn test_part_two() {
-    //     let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-    //     assert_eq!(result, None);
-    // }
+    #[test]
+    fn test_part_two_1() {
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 1,
+        ));
+        assert_eq!(result, Some(45));
+    }
+
+    #[test]
+    fn test_part_two_2() {
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 2,
+        ));
+        assert_eq!(result, Some(64));
+    }
 }
