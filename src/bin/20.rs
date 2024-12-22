@@ -155,10 +155,8 @@ pub fn part_one(input: &str) -> Option<usize> {
     let start_coord = find_needle_or_fail(&board, START);
     let goal_coord = find_needle_or_fail(&board, GOAL);
 
-    println!("Finding distances!");
     let distances = baseline(&board, start_coord, goal_coord);
 
-    println!("Found distances, checking cheats!");
     let cheat_wall_candidate_coords: Vec<Coord> = board
         .tiles
         .iter()
@@ -171,7 +169,6 @@ pub fn part_one(input: &str) -> Option<usize> {
         })
         .collect();
 
-    println!("Found cheat_wall_candidate_coords!");
     // Then, for each wall in the board, check
     // - left + right
     // - top + bottom
