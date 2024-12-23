@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cmp::min, collections::HashMap};
 
 use itertools::Itertools;
 
@@ -114,18 +114,18 @@ fn check_for_cheat(board: &Board, distances: &HashMap<Coord, u32>, coord: Coord)
     let east_coord = coord_in_direction(board, coord, Direction::East)?;
     let west_coord = coord_in_direction(board, coord, Direction::West)?;
 
-    if let Some(cheat) = check_coords_for_cheat(board, distances, north_coord, south_coord) {
+    if let Some(cheat) = check_coords_for_cheat_part_1(board, distances, north_coord, south_coord) {
         return Some(cheat);
     }
 
-    if let Some(cheat) = check_coords_for_cheat(board, distances, west_coord, east_coord) {
+    if let Some(cheat) = check_coords_for_cheat_part_1(board, distances, west_coord, east_coord) {
         return Some(cheat);
     }
 
     None
 }
 
-fn check_coords_for_cheat(
+fn check_coords_for_cheat_part_1(
     board: &Board,
     distances: &HashMap<(usize, usize), u32>,
     first: (usize, usize),
@@ -184,8 +184,97 @@ pub fn part_one(input: &str) -> Option<usize> {
     Some(cheat_over_threshold_count)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+fn manhattan_distance(first: Coord, second: Coord) -> usize {
+    first.0.abs_diff(second.0) + first.1.abs_diff(second.1)
+}
+
+fn non_wall_board_coords_within_manhattan_distance(
+    board: &Board,
+    coord: Coord,
+    max_dist: usize,
+) -> Vec<Coord> {
+    // Stupid/simple solution, instead of making some clever for-loops (which would be more efficient), just try all coords within a square and check
+    // if the manhattan distance is within max_dist
+    // Note: this also includes the coord itself, but we will implicitly filter that out later
+    let row_min = coord.0.checked_sub(max_dist).unwrap_or(0);
+    let row_max = min(board.rows - 1, coord.0 + max_dist); // Not inclusive
+
+    let col_min = coord.1.checked_sub(max_dist).unwrap_or(0);
+    let col_max = min(board.cols - 1, coord.1 + max_dist); // Not inclusive
+
+    (row_min..row_max+1)
+        .flat_map(|row| (col_min..col_max + 1).map(move |col| (row, col)))
+        .filter(|other| manhattan_distance(coord, *other) <= max_dist)
+        .collect()
+}
+
+pub fn part_two(input: &str) -> Option<usize> {
+    let board = Board::new(input)?;
+    // Note: There are no branches in the track
+    // Traverse and keep track of the cost per tile
+    let start_coord = find_needle_or_fail(&board, START);
+    let goal_coord = find_needle_or_fail(&board, GOAL);
+
+    let unsigned_distances = baseline(&board, start_coord, goal_coord);
+    let distances: HashMap<Coord, i32> = unsigned_distances
+        .clone()
+        .into_iter()
+        .map(|(k, v)| (k, i32::try_from(v).expect("Should convert u32 to i32")))
+        .collect();
+
+    // Do a similar approach this time as well, but instead of checking each cross (north/south) and (west/east),
+    // we now take each non-wall tile within a manhattan distance of 20 and consider it a potential end of the cheat.
+    // Then, we do a similar thing as the first part,
+    // We take the other coord, and check for distance[other] - distance[candidate] > manhattan_distance(candidate, other)
+
+    let non_wall_candidate_coords: Vec<Coord> = board
+        .tiles
+        .iter()
+        .enumerate()
+        .flat_map(|(i, row)| {
+            row.iter()
+                .enumerate()
+                .filter(|(_, tile)| **tile != WALL)
+                .map(move |(j, _)| (i, j))
+        })
+        .collect();
+
+    let cheats: Vec<i32> = non_wall_candidate_coords
+        .iter()
+        .flat_map(|coord| {
+            let end_candidates =
+                non_wall_board_coords_within_manhattan_distance(&board, *coord, 20);
+            end_candidates
+                .iter()
+                .filter_map(|candidate| {
+                    if let (Some(coord_dist), Some(candidate_dist)) =
+                        (distances.get(candidate), distances.get(coord))
+                    {
+                        let manhattan_dist: i32 = manhattan_distance(*coord, *candidate)
+                            .try_into()
+                            .expect("Should convert manhattan dist");
+                        let dist_diff = candidate_dist - coord_dist;
+                        let potential_cheat = dist_diff - manhattan_dist;
+                        if potential_cheat > 0 {
+                            Some(potential_cheat)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect_vec()
+        })
+        .collect();
+
+    // println!("cheats: {:?}", cheats);
+    // 952515 too low
+    // 1006932 too high
+
+    let cheat_over_threshold_count = cheats.iter().filter(|cheat| **cheat >= 100).count();
+
+    Some(cheat_over_threshold_count)
 }
 
 #[cfg(test)]
