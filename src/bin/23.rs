@@ -68,24 +68,70 @@ fn clique_has_t(clique: &ThreeClique) -> bool {
 //         P := P \ {v}
 //         X := X ⋃ {v}
 
-fn bron_kerbosch(required: HashSet<String>, possible: HashSet<String>, excluded: HashSet<String>, cliques: &mut Vec<Vec<String>>, graph: &Graph) {
-    if possible.is_empty() && excluded.is_empty() {
-        let clique = required.iter().cloned().collect_vec();
-        cliques.push(clique);
-    }
+struct Iteration {
+    required: HashSet<String>,
+    possible: HashSet<String>,
+    excluded: HashSet<String>,
+}
 
-    let mut new_possible = possible.clone();
-    let mut new_excluded = excluded.clone();
-    for v in possible.iter() {
-        let required_union_v: HashSet<String> = required.union(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
-        let possible_intersection_v: HashSet<String> = new_possible.intersection(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
-        let excluded_intersection_v: HashSet<String> = new_excluded.intersection(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
+fn bron_kerbosch(possible: HashSet<String>, graph: &Graph) -> Vec<Vec<String>> {
+    let mut iteration_stack: Vec<Iteration> = vec![];
+    iteration_stack.push(Iteration {
+        required: HashSet::new(),
+        possible,
+        excluded: HashSet::new(),
+    });
+    let mut cliques: Vec<Vec<String>> = vec![];
 
-        // let required_union_v: HashSet<String> = required.clone().union(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
-        bron_kerbosch(required_union_v, possible_intersection_v, excluded_intersection_v, cliques, graph);
-        new_possible.remove(v);
-        new_excluded.insert(v.clone());
+    while !iteration_stack.is_empty() {
+        let iteration = iteration_stack.pop().expect("Should have iteratoin state");
+        if iteration.possible.is_empty() && iteration.excluded.is_empty() {
+            let clique = iteration.required.iter().cloned().collect_vec();
+            cliques.push(clique);
+        }
+
+        let mut new_possible = iteration.possible.clone();
+        let mut new_excluded = iteration.excluded.clone();
+        for v in iteration.possible.iter() {
+            let neighbors: HashSet<String> = graph
+                .edges
+                .get(v)
+                .expect("Should have neighbors")
+                .iter()
+                .cloned()
+                .collect();
+            let required_union_v: HashSet<String> = iteration
+                .required
+                .union(&HashSet::from([v.clone()]))
+                .cloned()
+                .collect::<HashSet<String>>();
+            let possible_intersection_neigh_v: HashSet<String> = new_possible
+                .intersection(&HashSet::from(neighbors.clone()))
+                .cloned()
+                .collect::<HashSet<String>>();
+            let excluded_intersection_neigh_v: HashSet<String> = new_excluded
+                .intersection(&HashSet::from(neighbors))
+                .cloned()
+                .collect::<HashSet<String>>();
+
+            // let required_union_v: HashSet<String> = required.clone().union(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
+            iteration_stack.push(Iteration {
+                required: required_union_v,
+                possible: possible_intersection_neigh_v,
+                excluded: excluded_intersection_neigh_v,
+            });
+            // bron_kerbosch(
+            //     required_union_v,
+            //     possible_intersection_v,
+            //     excluded_intersection_v,
+            //     cliques,
+            //     graph,
+            // );
+            new_possible.remove(v);
+            new_excluded.insert(v.clone());
+        }
     }
+    cliques
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -125,10 +171,18 @@ pub fn part_one(input: &str) -> Option<u32> {
     // Find all 3-cliques by brute-force
     // Start in each vertex, for each adjacent neighbor explore it and its neighbors
     // If the start vector is found in 3 steps, we have found a clique
-    let relevant_cliques = cliques.into_iter().filter(|clique| clique_has_t(clique)).collect_vec();
+    let relevant_cliques = cliques
+        .into_iter()
+        .filter(|clique| clique_has_t(clique))
+        .collect_vec();
 
     // Find all the sets of three inter-connected computers. How many contain at least one computer with a name that starts with t?
-    Some(relevant_cliques.len().try_into().expect("Should convert u32 to usize"))
+    Some(
+        relevant_cliques
+            .len()
+            .try_into()
+            .expect("Should convert u32 to usize"),
+    )
     // None
 }
 
@@ -141,19 +195,26 @@ pub fn part_two(input: &str) -> Option<String> {
 
     let edges = add_vecs(edges_single_direction, edges_opposite_direction);
 
-    let mut cliques: Vec<Vec<String>> = vec![];
     let unique_vertices: HashSet<String> = edges
-    .iter()
-    .flat_map(|(first, second)| vec![first.clone(), second.clone()])
-    .collect();
+        .iter()
+        .flat_map(|(first, second)| vec![first.clone(), second.clone()])
+        .collect();
 
     let graph = Graph::new(edges);
 
     println!("Before bron kerbosch");
-    // bron_kerbosch(HashSet::new(), unique_vertices, HashSet::new(), &mut cliques, &graph);
+    let cliques = bron_kerbosch(unique_vertices, &graph);
     println!("cliques: {}", cliques.len());
 
-    None
+    let mut biggest_clique = cliques
+        .iter()
+        .max_by(|x, y| x.len().cmp(&y.len()))
+        .expect("Should have max!").clone();
+
+    biggest_clique.sort();
+
+    let output = biggest_clique.iter().join(",");
+    Some(output)
 }
 
 #[cfg(test)]
