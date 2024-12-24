@@ -44,6 +44,7 @@ fn normalized(clique: ThreeClique) -> ThreeClique {
 
 fn traverse_n_steps(graph: &Graph, from: &str, steps: usize) -> Vec<Vec<String>> {
     // Base case: steps = 1 or 0?
+    // Return Vec<Vec<
 
     vec![]
 }
