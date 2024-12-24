@@ -30,7 +30,16 @@ fn add_vecs(first: Vec<Edge>, second: Vec<Edge>) -> Vec<Edge> {
 }
 
 struct Graph {
-    edges: HashMap<String, Vec<String>>
+    edges: HashMap<String, Vec<String>>,
+}
+
+impl Graph {
+    fn new(edges: Vec<Edge>) -> Graph {
+        let edges_by_first = edges.into_iter().into_group_map();
+        Graph {
+            edges: edges_by_first,
+        }
+    }
 }
 
 type ThreeClique = (String, String, String);
@@ -42,26 +51,42 @@ fn normalized(clique: ThreeClique) -> ThreeClique {
     (out[0].clone(), out[1].clone(), out[2].clone())
 }
 
-fn traverse_n_steps(graph: &Graph, from: &str, steps: usize) -> Vec<Vec<String>> {
-    // Base case: steps = 1 or 0?
-    // Return Vec<Vec<
-
-    vec![]
+fn starts_with_t(s: &str) -> bool {
+    s.chars().nth(0).expect("Should have first char") == 't'
 }
 
-fn find_three_cliques(graph: &Graph, from: &str) -> Vec<ThreeClique> {
-    // Find all 3-cliques by brute-force
-    // Start in each vertex, for each adjacent neighbor explore it and its neighbors
-    // If the start vector is found in 3 steps, we have found a clique
-    // let mut out: Vec<Vec<String>>
+fn clique_has_t(clique: &ThreeClique) -> bool {
+    starts_with_t(&clique.0) || starts_with_t(&clique.1) | starts_with_t(&clique.2)
+}
 
-    for depth in 0..3 {
+// From https://en.wikipedia.org/wiki/Bron–Kerbosch_algorithm
+// algorithm BronKerbosch1(R, P, X) is
+//     if P and X are both empty then
+//         report R as a maximal clique
+//     for each vertex v in P do
+//         BronKerbosch1(R ⋃ {v}, P ⋂ N(v), X ⋂ N(v))
+//         P := P \ {v}
+//         X := X ⋃ {v}
 
+fn bron_kerbosch(required: HashSet<String>, possible: HashSet<String>, excluded: HashSet<String>, cliques: &mut Vec<Vec<String>>, graph: &Graph) {
+    if possible.is_empty() && excluded.is_empty() {
+        let clique = required.iter().cloned().collect_vec();
+        cliques.push(clique);
     }
 
-    vec![]
-}
+    let mut new_possible = possible.clone();
+    let mut new_excluded = excluded.clone();
+    for v in possible.iter() {
+        let required_union_v: HashSet<String> = required.union(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
+        let possible_intersection_v: HashSet<String> = new_possible.intersection(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
+        let excluded_intersection_v: HashSet<String> = new_excluded.intersection(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
 
+        // let required_union_v: HashSet<String> = required.clone().union(&HashSet::from([v.clone()])).cloned().collect::<HashSet<String>>();
+        bron_kerbosch(required_union_v, possible_intersection_v, excluded_intersection_v, cliques, graph);
+        new_possible.remove(v);
+        new_excluded.insert(v.clone());
+    }
+}
 
 pub fn part_one(input: &str) -> Option<u32> {
     // Idea: Create HashMap from beginning to list/hashset of adjacent vertices
@@ -79,18 +104,55 @@ pub fn part_one(input: &str) -> Option<u32> {
         .flat_map(|(first, second)| vec![first.clone(), second.clone()])
         .collect();
 
-    dbg!(edges.len());
-    dbg!(unique_vertices.len());
+    let graph = Graph::new(edges);
+    // dbg!(edges.len());
+    // dbg!(unique_vertices.len());
+    let mut cliques: HashSet<ThreeClique> = HashSet::new();
+    for u in unique_vertices {
+        let neighs = graph.edges.get(&u).expect("Should find neighbors");
+        for (v, w) in neighs.iter().tuple_combinations() {
+            if graph
+                .edges
+                .get(v)
+                .expect("Should find inner neighbors")
+                .contains(w)
+            {
+                cliques.insert(normalized((u.clone(), v.clone(), w.clone())));
+            }
+        }
+    }
 
     // Find all 3-cliques by brute-force
     // Start in each vertex, for each adjacent neighbor explore it and its neighbors
     // If the start vector is found in 3 steps, we have found a clique
+    let relevant_cliques = cliques.into_iter().filter(|clique| clique_has_t(clique)).collect_vec();
 
     // Find all the sets of three inter-connected computers. How many contain at least one computer with a name that starts with t?
-    None
+    Some(relevant_cliques.len().try_into().expect("Should convert u32 to usize"))
+    // None
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<String> {
+    let edges_single_direction = parse_edges(input).expect("Should parse edges");
+    let edges_opposite_direction = edges_single_direction
+        .iter()
+        .map(|edge| swapped_direction_edge(edge.clone()))
+        .collect_vec();
+
+    let edges = add_vecs(edges_single_direction, edges_opposite_direction);
+
+    let mut cliques: Vec<Vec<String>> = vec![];
+    let unique_vertices: HashSet<String> = edges
+    .iter()
+    .flat_map(|(first, second)| vec![first.clone(), second.clone()])
+    .collect();
+
+    let graph = Graph::new(edges);
+
+    println!("Before bron kerbosch");
+    // bron_kerbosch(HashSet::new(), unique_vertices, HashSet::new(), &mut cliques, &graph);
+    println!("cliques: {}", cliques.len());
+
     None
 }
 
@@ -107,6 +169,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some("co,de,ka,ta".to_string()));
     }
 }
