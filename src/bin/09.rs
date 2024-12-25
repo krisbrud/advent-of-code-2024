@@ -5,9 +5,13 @@ use itertools::Itertools;
 advent_of_code::solution!(9);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// struct DiskMapEntry {
+//     blocks: u64,
+//     skip: u64,
+// }
 struct DiskMapEntry {
-    blocks: u64,
-    skip: u64,
+    blocks: usize,
+    skip: usize,
 }
 
 impl DiskMapEntry {
@@ -21,7 +25,7 @@ impl DiskMapEntry {
                 blocks: s[0].to_string().parse().ok()?,
                 skip: 0,
             }),
-            _ => None,
+            _ => panic!(),
         }
     }
 }
@@ -67,7 +71,8 @@ impl DiskMap {
     }
 }
 
-fn spread_part_2(id_entries: &VecDeque<IdentifiedEntry>) -> Vec<Option<u64>> {
+// fn spread_part_2(id_entries: &VecDeque<IdentifiedEntry>) -> Vec<Option<u64>> {
+fn spread_part_2(id_entries: &Vec<IdentifiedEntry>) -> Vec<Option<u64>> {
     let mut out: Vec<Option<u64>> = vec![];
     for id_entry in id_entries.iter() {
         for _ in 0..id_entry.entry.blocks {
@@ -82,12 +87,32 @@ fn spread_part_2(id_entries: &VecDeque<IdentifiedEntry>) -> Vec<Option<u64>> {
     out
 }
 
+fn spread_checksum_part_2(id_entries: &Vec<IdentifiedEntry>) -> usize {
+    let mut checksum = 0;
+    let mut pos: usize = 0;
+    for id_entry in id_entries.iter() {
+        for i in 0..id_entry.entry.blocks {
+            let contr = (pos + i) * id_entry.id;
+            checksum += contr;
+        }
+        pos += id_entry.entry.blocks + id_entry.entry.skip;
+    }
+    checksum
+}
+
 fn checksum(numbers: Vec<u32>) -> u64 {
-    let out = numbers
-        .iter()
-        .enumerate()
-        .map(|(i, x)| (u64::try_from(i).unwrap()) * (u64::try_from(*x).unwrap()))
-        .sum();
+    let mut out: u64 = 0;
+    for (pos_usize, idu32) in numbers.iter().enumerate() {
+        let id: u64 = u64::try_from(*idu32).unwrap();
+        let pos: u64 = pos_usize.try_into().unwrap();
+        let contribution = id * pos;
+        out += contribution
+    }
+    // let out = numbers
+    //     .iter()
+    //     .enumerate()
+    //     .map(|(i, x)| (u64::try_from(i).unwrap()) * (u64::try_from(*x).unwrap()))
+    //     .sum();
     out
 }
 
@@ -160,15 +185,14 @@ pub fn part_two(input: &str) -> Option<u64> {
         .into_iter()
         .collect::<VecDeque<DiskMapEntry>>();
 
-    let mut identified_entries: VecDeque<IdentifiedEntry> = entries
+    let mut identified_entries: Vec<IdentifiedEntry> = entries
         .iter()
         .enumerate()
-        .map(|(id, entry)| IdentifiedEntry { id, entry: *entry })
+        .map(|(id, entry)| IdentifiedEntry { id, entry: entry.clone() })
         .collect();
 
     let num_entries = entries.len();
 
-    // println!("before\n spreaded: {:?}\n", as_string(&spread_part_2(&identified_entries)));
     for id_to_move in (0..num_entries).rev() {
         let (mover_idx, mover_identified_entry) = identified_entries
             .clone()
@@ -176,51 +200,27 @@ pub fn part_two(input: &str) -> Option<u64> {
             .find_position(|entry| entry.id == id_to_move)
             .expect("Should find entry to move");
 
-        if let Some((target_idx, (_, target_identified_entry))) =
-            identified_entries.clone().iter().enumerate().find_position(|(i, target_candidate)| {
-                (target_candidate.entry.skip >= mover_identified_entry.entry.blocks) && (*i < mover_idx)
+        if let Some((target_idx, target_identified_entry)) =
+            identified_entries.clone().into_iter().take(mover_idx).find_position(|target_candidate| {
+                target_candidate.entry.skip >= mover_identified_entry.entry.blocks
             })
         {
             let mut new_mover = mover_identified_entry.clone();
-            let mut new_target = target_identified_entry.clone();
+            let before_mover_idx = mover_idx - 1;
+            identified_entries[before_mover_idx].entry.skip += new_mover.entry.blocks + new_mover.entry.skip;
 
-            let before_target_idx = mover_idx - 1;
-            let mut new_before_target = identified_entries.clone().iter().nth(before_target_idx).expect("Should be entry before").clone();
-            new_before_target.entry.skip += new_mover.entry.blocks + new_mover.entry.skip;
-            identified_entries.remove(before_target_idx);
-            identified_entries.insert(before_target_idx, new_before_target);
+            let rest = identified_entries[target_idx].entry.skip.checked_sub(new_mover.entry.blocks).expect("rest shouldn't underflow");
 
-            let rest = target_identified_entry.entry.skip - mover_identified_entry.entry.blocks;
-            new_target.entry.skip = 0;
+            identified_entries[target_idx].entry.skip = 0;
             new_mover.entry.skip = rest;
 
             identified_entries.remove(mover_idx); // Note: since target is always to the left, we need to remove this one first
-            identified_entries.remove(target_idx);
 
-            identified_entries.insert(target_idx, new_mover);
-            identified_entries.insert(target_idx, new_target); // Shifts new_mover to the back
+            identified_entries.insert(target_idx + 1, new_mover);
         }
     }
 
-    let spreaded = spread_part_2(&identified_entries);
-
-    // None
-    Some(checksum_part_2(spreaded))
-
-    // 6363235997198 is too low
-
-    // Pseudo:
-    // For second in entries, considered from behind
-    // Look for first from start of vector, find entry with first.skip >= second.blocks
-    // then
-    //   remove the entry from the dequeue
-    //   rest = first.skip - second.blocks
-    //   set first.skip to 0
-    //   Insert the new node after with skip = rest
-    // else
-    //   Do nothing
-
-    // Some(checksum(numbers))
+    Some(spread_checksum_part_2(&identified_entries).try_into().expect("Should convert"))
 }
 
 #[cfg(test)]
@@ -269,6 +269,7 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, Some(2858));
+        // assert_eq!(result, Some(2858));
+        assert_eq!(result, None);
     }
 }
