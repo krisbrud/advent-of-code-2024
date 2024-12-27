@@ -283,27 +283,38 @@ fn find_a_components(
     a_components: Vec<i64>,
     solutions: &mut Vec<Vec<i64>>,
 ) {
-    // Find desired partial output
-    let partial_output_length = instructions.len() + 2;
-    let desired_partial_output = last_n_elements(instructions.clone(), partial_output_length);
+    if a_components.len() != 0 {
+        // Find desired partial output
+        let partial_output_length = a_components.len();
+        let desired_partial_output = last_n_elements(instructions.clone(), partial_output_length);
 
-    let (_, output) = simulate(Computer {
-        a: a_from_components(a_components.clone()),
-        b: 0,
-        c: 0,
-    }, instructions.clone());
+        let (_, output) = simulate(
+            Computer {
+                a: a_from_components(a_components.clone()),
+                b: 0,
+                c: 0,
+            },
+            instructions.clone(),
+        );
 
-    if output != desired_partial_output {
-        return;
-    }
+        if output != desired_partial_output {
+            return;
+        }
 
-    if output == *instructions {
-        solutions.push(a_components);
+        if output == *instructions {
+            solutions.push(a_components);
+            return;
+        }
     }
 
     for i in 0..8 {
         for j in 0..8 {
-            let next_a_components = vec![i, j].iter().clone().chain(instructions.iter()).cloned().collect_vec();
+            let next_a_components = vec![i, j]
+                .iter()
+                .clone()
+                .chain(a_components.iter())
+                .cloned()
+                .collect_vec();
             find_a_components(instructions, next_a_components, solutions);
         }
     }
@@ -314,60 +325,19 @@ fn find_a_components(
 pub fn part_two(input: &str) -> Option<i64> {
     let (_, instructions) = parse(input).expect("Should parse input!");
 
-    let mut a_components: Vec<i64> = vec![];
+    let a_components: Vec<i64> = vec![];
+    let mut solutions: Vec<Vec<i64>> = vec![];
 
-    for i in 0..8 {
-        println!("i: {}", i);
-        let desired_output = instructions
-            .iter()
-            .rev()
-            .take((i + 1) * 2)
-            .rev()
-            .cloned()
-            .collect_vec();
-        println!("desired: {:?}", desired_output.clone());
+    find_a_components(&instructions, a_components, &mut solutions);
 
-        // Two numbers at a time
-        'middle: for j in 0..8 {
-            for k in 0..8 {
-                // let candidate_a_components = vec![j, k].iter().chain(a_components.iter()).cloned().collect_vec();
-                let candidates = vec![j, k];
-                let candidate_a_components = candidates
-                    .iter()
-                    .chain(a_components.iter())
-                    .cloned()
-                    .collect_vec();
-                println!("Candidate components: {:?}", candidate_a_components);
-                let initial_computer = Computer {
-                    a: a_from_components(candidate_a_components),
-                    b: 0,
-                    c: 0,
-                };
+    println!("solutions: {:?}", solutions.clone());
 
-                let (_, output) = simulate(initial_computer, instructions.clone());
+    let smallest_a = solutions
+        .iter()
+        .map(|sol| a_from_components(sol.clone()))
+        .min();
 
-                if output == desired_output {
-                    println!("Found desired output with candidates! {:?}", candidates);
-                    for c in candidates {
-                        // a_components.insert(0, *c);
-                        a_components.push(c);
-                    }
-
-                    break 'middle;
-                }
-            }
-        }
-    }
-
-    Some(a_from_components(a_components))
-
-    // let out_string: String = outputs
-    //     .iter()
-    //     .map(|output| output.to_string())
-    //     .join(",")
-    //     .to_string();
-
-    // Some(out_string)
+    smallest_a
 }
 
 #[cfg(test)]
