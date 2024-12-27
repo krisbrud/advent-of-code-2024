@@ -6,19 +6,6 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-// Avoid shenanigans from bitwise-xor
-// fn xor(a: bool, b: bool) -> bool {
-//     (a || b) && !(a && b)
-// }
-
-// fn and(a: bool, b: bool) -> bool {
-//     a && b
-// }
-
-// fn or(a: bool, b: bool) -> bool {
-//     a || b
-// }
-
 #[derive(Clone, Debug)]
 enum Operator {
     XOR,
@@ -54,6 +41,7 @@ lazy_static! {
         Regex::new(r"([a-z0-9]+) (AND|OR|XOR) ([a-z0-9]+) -> ([a-z0-9]+)").unwrap();
     static ref digit_pattern: Regex = Regex::new(r"^z(\d\d)$").unwrap();
 }
+
 impl Gate {
     fn new(s: &str) -> Option<Gate> {
         let caps = gate_pattern.captures(s)?;
@@ -81,18 +69,21 @@ fn find_value(
     all_gates: &HashMap<String, Gate>,
     given_values: &HashMap<String, bool>,
 ) -> bool {
-    let a_value = *given_values.get(&gate.in_a).unwrap_or({
-        // println!("{:?}", gate);
+    let a = if let Some(a_value) = given_values.get(&gate.in_a) {
+        *a_value
+    } else {
         let a_gate = all_gates.get(&gate.in_a).expect("Should find gate a");
-        &find_value(a_gate.clone(), all_gates, given_values)
-    });
+        find_value(a_gate.clone(), all_gates, given_values)
+    };
 
-    let b_value = *given_values.get(&gate.in_b).unwrap_or({
+    let b = if let Some(b_value) = given_values.get(&gate.in_b) {
+        *b_value
+    } else {
         let b_gate = all_gates.get(&gate.in_b).expect("Should find gate b");
-        &find_value(b_gate.clone(), all_gates, given_values)
-    });
+        find_value(b_gate.clone(), all_gates, given_values)
+    };
 
-    simulate(a_value, b_value, gate.operator)
+    simulate(a, b, gate.operator)
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
@@ -116,6 +107,7 @@ pub fn part_one(input: &str) -> Option<u64> {
 
     let mut known_values: HashMap<String, bool> = given_values.clone().into_iter().collect();
 
+
     // Make a map of wires and their known values
     let gates = input
         .split("\n\n")
@@ -124,13 +116,12 @@ pub fn part_one(input: &str) -> Option<u64> {
         .map(|line| Gate::new(line))
         .collect::<Option<Vec<Gate>>>()?;
 
-    // let mut unknown_gates = gates.clone();
+    // dbg!(gates.clone());
+
     let all_gates: HashMap<String, Gate> = gates
         .iter()
         .map(|gate| (gate.out.clone(), gate.clone()))
         .collect();
-
-    // While there are unknown wire outputs
 
     let z_values: HashMap<String, bool> = gates
         .iter()
@@ -148,14 +139,6 @@ pub fn part_one(input: &str) -> Option<u64> {
         let d = digits(label).expect("Should find digits");
         2u64.pow(d)
     }).sum();
-
-    // let output = z_values.iter().filter(|(label, value)| {
-    //     // let d = digits(**label).expect("should find digits");
-    // })
-
-    // How to simulate?
-    // 1: Keep iterating every unknown gate
-    // 2: Recursively find values from each z-gate
 
     Some(output)
 }
