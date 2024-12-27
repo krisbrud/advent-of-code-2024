@@ -259,9 +259,115 @@ fn simulate(initial_computer: Computer, instructions: Vec<i64>) -> (Computer, Ve
 // 0 is only that writes to a
 // 7 is only that writes to c
 
+fn a_from_components(components: Vec<i64>) -> i64 {
+    components
+        .iter()
+        .enumerate()
+        .map(|(i, c)| c * 8i64.pow(i.try_into().expect("Should convert")))
+        .sum()
+}
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+fn last_n_elements(v: Vec<i64>, n: usize) -> Vec<i64> {
+    v.iter().rev().take(n).rev().cloned().collect_vec()
+}
+
+// procedure backtrack(P, c) is
+//     if reject(P, c) then return
+//     if accept(P, c) then output(P, c)
+//     s ← first(P, c)
+//     while s ≠ NULL do
+//         backtrack(P, s)
+//         s ← next(P, s)
+fn find_a_components(
+    instructions: &Vec<i64>,
+    a_components: Vec<i64>,
+    solutions: &mut Vec<Vec<i64>>,
+) {
+    // Find desired partial output
+    let partial_output_length = instructions.len() + 2;
+    let desired_partial_output = last_n_elements(instructions.clone(), partial_output_length);
+
+    let (_, output) = simulate(Computer {
+        a: a_from_components(a_components.clone()),
+        b: 0,
+        c: 0,
+    }, instructions.clone());
+
+    if output != desired_partial_output {
+        return;
+    }
+
+    if output == *instructions {
+        solutions.push(a_components);
+    }
+
+    for i in 0..8 {
+        for j in 0..8 {
+            let next_a_components = vec![i, j].iter().clone().chain(instructions.iter()).cloned().collect_vec();
+            find_a_components(instructions, next_a_components, solutions);
+        }
+    }
+}
+
+// Simulate either in the
+
+pub fn part_two(input: &str) -> Option<i64> {
+    let (_, instructions) = parse(input).expect("Should parse input!");
+
+    let mut a_components: Vec<i64> = vec![];
+
+    for i in 0..8 {
+        println!("i: {}", i);
+        let desired_output = instructions
+            .iter()
+            .rev()
+            .take((i + 1) * 2)
+            .rev()
+            .cloned()
+            .collect_vec();
+        println!("desired: {:?}", desired_output.clone());
+
+        // Two numbers at a time
+        'middle: for j in 0..8 {
+            for k in 0..8 {
+                // let candidate_a_components = vec![j, k].iter().chain(a_components.iter()).cloned().collect_vec();
+                let candidates = vec![j, k];
+                let candidate_a_components = candidates
+                    .iter()
+                    .chain(a_components.iter())
+                    .cloned()
+                    .collect_vec();
+                println!("Candidate components: {:?}", candidate_a_components);
+                let initial_computer = Computer {
+                    a: a_from_components(candidate_a_components),
+                    b: 0,
+                    c: 0,
+                };
+
+                let (_, output) = simulate(initial_computer, instructions.clone());
+
+                if output == desired_output {
+                    println!("Found desired output with candidates! {:?}", candidates);
+                    for c in candidates {
+                        // a_components.insert(0, *c);
+                        a_components.push(c);
+                    }
+
+                    break 'middle;
+                }
+            }
+        }
+    }
+
+    Some(a_from_components(a_components))
+
+    // let out_string: String = outputs
+    //     .iter()
+    //     .map(|output| output.to_string())
+    //     .join(",")
+    //     .to_string();
+
+    // Some(out_string)
 }
 
 #[cfg(test)]
@@ -307,7 +413,14 @@ mod tests {
     // If register B contains 2024 and register C contains 43690, the program 4,0 would set register B to 44354.
     #[test]
     fn test_fifth_example() {
-        let (computer, outputs) = simulate(Computer { a: 0, b: 2024, c: 43690 }, vec![4, 0]);
+        let (computer, outputs) = simulate(
+            Computer {
+                a: 0,
+                b: 2024,
+                c: 43690,
+            },
+            vec![4, 0],
+        );
         assert_eq!(44354, computer.b);
     }
 
