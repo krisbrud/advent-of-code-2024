@@ -144,6 +144,34 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
+    // Other interesting rows:
+    // y06 XOR x06 -> gbp
+    // y11 XOR x11 -> sqv
+    // y16 XOR x16 -> vgv
+
+    // frp XOR sqv -> tqm
+    // scp XOR gbp -> vwr
+    // vgv XOR hpt -> kfs
+
+    // x05 XOR y05 -> mpk
+
+    // TODO
+    // Make a function to swap the known swapped wires
+    // Make a function to create the bit array from a u64
+    // Make a function to create the u64 from a bit array
+
+    // The following _must_ be wrong
+    // x06 AND y06 -> z06
+    // sqv AND frp -> z11
+    // bmp OR vjc -> z16
+
+    // Need following values:
+    // y05 AND x05 -> qjv
+    // x10 AND y10 -> jpc
+    // y15 AND x15 -> ksg
+
+    // This one should actually be there
+    // gwr OR mmj -> z45
     None
 }
 
