@@ -143,6 +143,13 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(output)
 }
 
+fn apply_overrides(gate: Gate) -> Gate {
+    match &gate.out {
+
+    }
+
+}
+
 pub fn part_two(input: &str) -> Option<u32> {
     // Other interesting rows:
     // y06 XOR x06 -> gbp
@@ -169,6 +176,16 @@ pub fn part_two(input: &str) -> Option<u32> {
     // y05 AND x05 -> qjv
     // x10 AND y10 -> jpc
     // y15 AND x15 -> ksg
+
+    // The following _must_ be wrong
+    // x06 AND y06 -> z06
+    // y05 AND x05 -> qjv
+
+    // x10 AND y10 -> jpc
+    // sqv AND frp -> z11
+
+    // y15 AND x15 -> ksg
+    // bmp OR vjc -> z16
 
     // This one should actually be there
     // gwr OR mmj -> z45
