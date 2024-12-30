@@ -457,16 +457,30 @@ fn optimal_numpad_path(from: NumPad, to: NumPad) -> Vec<DirPad> {
     solution
 }
 
-fn optimal_numpad_path_with_a(from: NumPad, to: NumPad) -> Vec<DirPad> {
-    // optimal_numpad_path(from, to)
-    //     .into_iter()
-    //     .chain([DirPad::A])
-    //     .collect()
-    [DirPad::A]
+fn optimal_numpad_parent_pushes_with_a_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
+    optimal_numpad_path(from, to)
         .into_iter()
-        .chain(optimal_numpad_path(from, to))
+        .chain([DirPad::A])
         .collect()
+    // [DirPad::A]
+    //     .into_iter()
+    //     .chain(optimal_numpad_path(from, to))
+    //     .chain([DirPad])
+    //     .collect()
 }
+
+fn optimal_numpad_parent_path_with_a_prefix_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
+    optimal_numpad_path(from, to)
+        .into_iter()
+        .chain([DirPad::A])
+        .collect()
+    // [DirPad::A]
+    //     .into_iter()
+    //     .chain(optimal_numpad_path(from, to))
+    //     .chain([DirPad])
+    //     .collect()
+}
+
 
 fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
     match to {
@@ -508,7 +522,13 @@ fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
     }
 }
 
-fn optimal_dirpad_path_with_a(from: DirPad, to: DirPad) -> Vec<DirPad> {
+fn optimal_dirpad_parent_pushes_with_a_suffix(from: DirPad, to: DirPad) -> Vec<DirPad> {
+    // [DirPad::A].into_iter().chain(
+    // optimal_dirpad_path(from, to)
+    //     .into_iter()
+    //     .chain([DirPad::A]))
+    //     .collect()
+
     optimal_dirpad_path(from, to)
         .into_iter()
         .chain([DirPad::A])
@@ -522,7 +542,7 @@ fn presses_needed(
     to: DirPad,
 ) -> u64 {
     if depth == 0 {
-        let optimal = optimal_dirpad_path_with_a(from, to);
+        let optimal = optimal_dirpad_parent_pushes_with_a_suffix(from, to);
         return optimal
             .len()
             .try_into()
@@ -534,13 +554,58 @@ fn presses_needed(
         return *cached_result;
     }
 
-    let parent_pushes = optimal_dirpad_path_with_a(from, to);
+    // let parent_pushes = if depth != 1 {
+    //     optimal_dirpad_path(DirPad::A, from) // Doesn't come for free unless we are one step away from the human pressing buttons
+    //         .into_iter()
+    //         .chain(optimal_dirpad_parent_pushes_with_a_suffix(from, to).into_iter())
+    //         .collect_vec()
+    // } else {
+    //     optimal_dirpad_parent_pushes_with_a_suffix(from, to)
+    // };
 
-    let result = parent_pushes
+    let parent_pushes = optimal_dirpad_parent_pushes_with_a_suffix(from, to);
+    // let parent_pushes = [DirPad::A].into_iter().chain(optimal_dirpad_path_with_a_suffix(from, to).into_iter()).collect_vec();
+
+    // let result = parent_pushes
+    //     .iter()
+    //     .tuple_windows()
+    //     .map(|(next_from, next_to)| presses_needed(cache, depth - 1, *next_from, *next_to))
+    //     .sum();
+
+    let result = if parent_pushes.len() >= 2 {
+        parent_pushes
         .iter()
         .tuple_windows()
-        .map(|(next_from, next_to)| presses_needed(cache, depth - 1, *next_from, *next_to))
+        .map(|(next_from, next_to)| {
+            presses_needed(cache, depth - 1, *next_from, *next_to)
+        }
+        )
         .sum();
+
+    // let result = if parent_pushes.len() >= 2 {
+    //     parent_pushes
+    //     .iter()
+    //     .tuple_windows()
+    //     .map(|(next_from, next_to)| {
+    //         presses_needed(cache, depth - 1, DirPad::A, *next_from) +
+    //         presses_needed(cache, depth - 1, *next_from, *next_to)
+    //     }
+    //     )
+    //     .sum();
+
+
+    // let result = if parent_pushes.len() >= 2 {
+    //     parent_pushes
+    //     .iter()
+    //     .tuple_windows()
+    //     .map(|(next_from, next_to)| {
+    //         presses_needed(cache, depth - 1, DirPad::A, *next_from) +
+    //         presses_needed(cache, depth - 1, *next_from, *next_to)
+    //     }
+    //     )
+    //     .sum()
+    // } else { 1 };
+
 
     cache.insert((depth, from, to), result);
 
@@ -559,13 +624,15 @@ fn solve_single_part_2(
         .map(|(from_numpad_char, to_numpad_char)| {
             let from_numpad = parse_numpad(from_numpad_char);
             let to_numpad = parse_numpad(to_numpad_char);
-            let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
+            // let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
+            let opt_parent_numpad_pushes = optimal_numpad_parent_pushes_with_a_suffix(from_numpad, to_numpad);
 
             // We know that there are no consecutive numpad numbers/A's in the input, so we can use tuple_windows safely
-            let button_presses: u64 = opt_numpad_path
+            let button_presses: u64 = opt_parent_numpad_pushes
                 .iter()
                 .tuple_windows()
                 .map(|(from_dirpad, to_dirpad)| {
+                    // presses_needed(cache, max_depth, DirPad::A, *from_dirpad) +
                     presses_needed(cache, max_depth, *from_dirpad, *to_dirpad)
                 })
                 .sum();
@@ -592,6 +659,10 @@ fn solve_all_part_2(input: &str, max_depth: usize) -> Option<u64> {
         .map(|code| solve_single_part_2(code, max_depth, &mut cache))
         .sum();
 
+    for (k, v) in cache {
+        println!("key: {:?}, value: {}", k, v);
+    }
+
     Some(total_complexity)
 }
 
@@ -605,6 +676,30 @@ pub fn part_two(input: &str) -> Option<u64> {
 
     solve_all_part_2(input, 25)
 }
+
+/*
+Debugging:
+key: (2, Right, A), value: 4 - Seems fine
+key: (1, Right, Up), value: 5
+key: (1, Left, Left), value: 0
+key: (1, Down, Left), value: 4
+key: (1, Left, Right), value: 3
+key: (2, Down, Left), value: 10 - this one is wrong (should be 8) - why?
+key: (1, Right, Right), value: 0
+key: (2, Left, A), value: 14
+key: (1, Down, Up), value: 2
+key: (2, Down, Down), value: 10
+key: (2, Up, Up), value: 6
+key: (2, Left, Left), value: 10
+key: (1, Up, A), value: 2
+key: (2, Down, Right), value: 9
+key: (2, Right, Right), value: 5
+key: (1, Left, A), value: 6
+key: (1, Right, A), value: 2
+key: (2, Up, A), value: 5
+key: (1, Down, A), value: 5
+key: (2, Down, A), value: 14
+*/
 
 #[cfg(test)]
 mod tests {
