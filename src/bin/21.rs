@@ -412,14 +412,14 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
         .get(&to)
         .expect("should find coord coord from numpad");
 
-    let vertical_dir = if target_coord.0 > from_coord.0 {
+    let vertical_dir = if target_coord.0 < from_coord.0 {
         DirPad::Up
     } else {
         DirPad::Down
     };
     let vertical_abs_diff = target_coord.0.abs_diff(from_coord.0);
 
-    let horizontal_dir = if target_coord.1 > from_coord.1 {
+    let horizontal_dir = if target_coord.1 < from_coord.1 {
         DirPad::Left
     } else {
         DirPad::Right
@@ -483,6 +483,12 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
             match to {
                 NumPad::One | NumPad::Four | NumPad::Seven => {
                     // Up then left
+                    for _ in 0..vertical_abs_diff {
+                        solution.push(vertical_dir);
+                    }
+                    for _ in 0..horizontal_abs_diff {
+                        solution.push(horizontal_dir);
+                    }
                 }
                 _ => {
                     if horizontal_dir == DirPad::Left {
@@ -508,70 +514,11 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
     solution
 }
 
-// fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
-//     let mut solution = vec![];
-//     let from_coord = coord_from_numpad
-//         .get(&from)
-//         .expect("should find coord coord from numpad");
-//     let target_coord = coord_from_numpad
-//         .get(&to)
-//         .expect("should find coord coord from numpad");
-
-//     let vertical_dir = if target_coord.0 > from_coord.0 {
-//         DirPad::Up
-//     } else {
-//         DirPad::Down
-//     };
-//     let vertical_abs_diff = target_coord.0.abs_diff(from_coord.0);
-
-//     let horizontal_dir = if target_coord.1 > from_coord.1 {
-//         DirPad::Left
-//     } else {
-//         DirPad::Right
-//     };
-//     let horizontal_abs_diff = target_coord.1.abs_diff(from_coord.1);
-
-//     match from {
-//         NumPad::Seven | NumPad::Four | NumPad::One => {
-//             // Left column. Go horizontally then vertically
-//             for _ in 0..horizontal_abs_diff {
-//                 solution.push(horizontal_dir);
-//             }
-//             for _ in 0..vertical_abs_diff {
-//                 solution.push(vertical_dir);
-//             }
-//         }
-
-//         NumPad::Two
-//         | NumPad::Three
-//         | NumPad::Five
-//         | NumPad::Six
-//         | NumPad::Eight
-//         | NumPad::Nine
-//         | NumPad::Zero
-//         | NumPad::A => {
-//             // Middle or right column. Go vertically and then horizontally
-//             for _ in 0..vertical_abs_diff {
-//                 solution.push(vertical_dir);
-//             }
-//             for _ in 0..horizontal_abs_diff {
-//                 solution.push(horizontal_dir);
-//             }
-//         }
-//     }
-//     solution
-// }
-
 fn optimal_numpad_parent_path_with_a_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
     optimal_numpad_parent_pushes(from, to)
         .into_iter()
         .chain([DirPad::A])
         .collect()
-    // [DirPad::A]
-    //     .into_iter()
-    //     .chain(optimal_numpad_path(from, to))
-    //     .chain([DirPad])
-    //     .collect()
 }
 
 fn optimal_numpad_parent_path_with_a_prefix_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
@@ -658,31 +605,18 @@ fn pushes_needed(
     }
 
     // If we are at zero depth (human keypad, just press the optimal path)
-    if depth == 0 {
-        return desired_sequence.len().try_into().expect("Should convert");
-    }
+    // let mut result = 0;
 
-    // Check cache if we already have a solution
-
-    // Find the pushes the parent needs to take to move the dirpad from the current position to the desired one
-    // let parent_pushes = if depth != 1 {
-    //     optimal_dirpad_parent_path_with_a_prefix_suffix(from, to)
-    // } else {
-    //     optimal_dirpad_parent_path_with_a_suffix(from, to)
-    // };
-
-    // let result = desired_sequence
-    let result = [DirPad::A].iter().chain(
-        desired_sequence
-        .iter())
-        .tuple_windows()
-        .map(|(next_from, next_to)| {
-            // let next_sequence = optimal_dirpad_parent_path_with_a_prefix_suffix(*next_from, *next_to);
-            // let next_sequence = optimal_dirpad_parent_path_with_a_suffix(*next_from, *next_to);
-            // pushes_needed(cache, depth - 1, next_sequence)
-            move_count_dirpad(cache, *next_from, *next_to, depth)
-        })
-        .sum();
+    let result = if depth == 0 {
+        desired_sequence.len().try_into().expect("Should convert")
+    } else {
+        [DirPad::A]
+            .iter()
+            .chain(desired_sequence.iter())
+            .tuple_windows()
+            .map(|(next_from, next_to)| move_count_dirpad(cache, *next_from, *next_to, depth))
+            .sum()
+    };
 
     cache.insert((depth, desired_sequence), result);
 
@@ -716,8 +650,24 @@ fn move_count_numpad(
     }
 
     // let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
-    let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
+    let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
+    // let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
     pushes_needed(cache, depth, next_sequence) // Keep depth
+}
+
+fn get_button_presses(code: &str, max_depth: usize, cache: &mut HashMap<(usize, Vec<DirPad>), u64>) -> u64 {
+    let prepended_code: Vec<char> = ['A'].into_iter().chain(code.chars()).collect();
+    let button_presses: u64 = prepended_code
+        .iter()
+        .tuple_windows::<(_, _)>()
+        .map(|(from_numpad_char, to_numpad_char)| {
+            let from_numpad = parse_numpad(from_numpad_char);
+            let to_numpad = parse_numpad(to_numpad_char);
+            let button_presses: u64 = move_count_numpad(cache, from_numpad, to_numpad, max_depth);
+            button_presses
+        })
+        .sum();
+    button_presses
 }
 
 fn solve_single_part_2(
@@ -725,40 +675,8 @@ fn solve_single_part_2(
     max_depth: usize,
     cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
 ) -> u64 {
-    let prepended_code: Vec<char> = ['A'].into_iter().chain(code.chars()).collect();
-    // let optimal_numpad_full_path = optimal_numpad_path(from, to)
-    let button_presses: u64 = prepended_code
-        .iter()
-        .tuple_windows::<(_, _)>()
-        .map(|(from_numpad_char, to_numpad_char)| {
-            let from_numpad = parse_numpad(from_numpad_char);
-            let to_numpad = parse_numpad(to_numpad_char);
-            // let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
-            // let opt_parent_numpad_pushes =
-            //     // optimal_numpad_parent_path_with_a_suffix(from_numpad, to_numpad);
-            //     optimal_numpad_parent_path_with_a_prefix_suffix(from_numpad, to_numpad);
-            let button_presses: u64 = move_count_numpad(cache, from_numpad, to_numpad, max_depth);
 
-            // let button_presses: u64 = opt_parent_numpad_pushes
-            //     .iter()
-            //     .tuple_windows()
-            //     // .map(|dirpad| {
-            //     .map(|(from_dirpad, to_dirpad)| {
-            //         // pushes_needed(cache, max_depth, DirPad::A, *dirpad)
-            //         // let bar = presses_needed(cache, max_depth, DirPad::A, *dirpad);
-            //         pushes_needed(cache, max_depth, *from_dirpad, *to_dirpad)
-            //     })
-            //     .sum();
-            // let button_presses: u64 = opt_parent_numpad_pushes
-            //     .iter()
-            //     .tuple_windows()
-            //     .map(|(from, to)| move_count_numpad(cache, *from, *to, max_depth))
-            //     .sum();
-            // pushes_needed(cache, max_depth, opt_parent_numpad_pushes);
-            // let button_presses = presses_needed(cache, depth, from_numpad, to_numpad);
-            button_presses
-        })
-        .sum();
+    let button_presses = get_button_presses(code, max_depth, cache);
     println!("code: {}, button presses: {}", code, button_presses);
 
     let numeric_part: u64 = code[0..3].parse().expect("Should parse numeric part!");
@@ -768,20 +686,24 @@ fn solve_single_part_2(
     complexity
 }
 
+fn empty_cache() -> HashMap<(usize, Vec<DirPad>), u64> {
+    HashMap::new()
+}
+
 fn solve_all_part_2(input: &str, max_depth: usize) -> Option<u64> {
     let codes = input.lines().collect_vec();
 
     // let mut cache: HashMap<(usize, DirPad, DirPad), u64> = HashMap::new();
-    let mut cache: HashMap<(usize, Vec<DirPad>), u64> = HashMap::new();
+    let mut cache = empty_cache();
 
     let total_complexity = codes
         .iter()
         .map(|code| solve_single_part_2(code, max_depth, &mut cache))
         .sum();
 
-    for (k, v) in cache {
-        println!("key: {:?}, value: {}", k, v);
-    }
+    // for (k, v) in cache {
+    //     println!("key: {:?}, value: {}", k, v);
+    // }
 
     Some(total_complexity)
 }
@@ -840,6 +762,44 @@ mod tests {
     }
 
     #[test]
+    fn test_part_two_depth_0() {
+        let result = get_button_presses("029A", 0, &mut empty_cache());
+        assert_eq!(result, "<A^A>^^AvvvA".len().try_into().unwrap());
+    }
+
+
+    #[test]
+    fn test_part_two_first_presses() {
+        let result = get_button_presses("029A", 2, &mut empty_cache());
+        assert_eq!(result, 68);
+    }
+
+    #[test]
+    fn test_part_two_second_presses() {
+        let result = get_button_presses("980A", 2, &mut empty_cache());
+        assert_eq!(result, 60);
+    }
+
+    #[test]
+    fn test_part_two_third_presses() {
+        let result = get_button_presses("179A", 2, &mut empty_cache());
+        assert_eq!(result, 68);
+    }
+
+    #[test]
+    fn test_part_two_fourth_presses() {
+        let result = get_button_presses("456A", 2, &mut empty_cache());
+        assert_eq!(result, 64);
+    }
+
+    #[test]
+    fn test_part_two_fifth_presses() {
+        let result = get_button_presses("379A", 2, &mut empty_cache());
+        assert_eq!(result, 64);
+    }
+
+
+    #[test]
     fn test_part_two_first() {
         let result = solve_all_part_2("029A", 2);
         assert_eq!(result, Some(68 * 29));
@@ -850,6 +810,7 @@ mod tests {
         let result = solve_all_part_2("980A", 2);
         assert_eq!(result, Some(60 * 980));
     }
+
 
     #[test]
     fn test_part_two_third() {
