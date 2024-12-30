@@ -653,21 +653,16 @@ fn pushes_needed(
     depth: usize,
     desired_sequence: Vec<DirPad>,
 ) -> u64 {
-    // If we are at zero depth (human keypad, just press the optimal path)
-    if depth == 0 {
-        return desired_sequence.len().try_into().expect("Should convert");
-        // let optimal = optimal_dirpad_parent_path_with_a_suffix(from, to);
-        // // let optimal = optimal_dirpad_path(from, to);
-        // return optimal
-        //     .len()
-        //     .try_into()
-        //     .expect("Should convert usize to u64");
-    }
-
-    // Check cache if we already have a solution
     if let Some(cached_result) = cache.get(&(depth, desired_sequence.clone())) {
         return *cached_result;
     }
+
+    // If we are at zero depth (human keypad, just press the optimal path)
+    if depth == 0 {
+        return desired_sequence.len().try_into().expect("Should convert");
+    }
+
+    // Check cache if we already have a solution
 
     // Find the pushes the parent needs to take to move the dirpad from the current position to the desired one
     // let parent_pushes = if depth != 1 {
@@ -720,8 +715,8 @@ fn move_count_numpad(
         return 1;
     }
 
-    let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
-    // let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
+    // let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
+    let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
     pushes_needed(cache, depth, next_sequence) // Keep depth
 }
 
@@ -764,6 +759,7 @@ fn solve_single_part_2(
             button_presses
         })
         .sum();
+    println!("code: {}, button presses: {}", code, button_presses);
 
     let numeric_part: u64 = code[0..3].parse().expect("Should parse numeric part!");
     let complexity: u64 = button_presses * numeric_part;
@@ -841,5 +837,35 @@ mod tests {
         let result = solve_all_part_2(&advent_of_code::template::read_file("examples", DAY), 2);
         // let result = solve_all_part_2(&advent_of_code::template::read_file("examples", DAY), 3);
         assert_eq!(result, Some(126384));
+    }
+
+    #[test]
+    fn test_part_two_first() {
+        let result = solve_all_part_2("029A", 2);
+        assert_eq!(result, Some(68 * 29));
+    }
+
+    #[test]
+    fn test_part_two_second() {
+        let result = solve_all_part_2("980A", 2);
+        assert_eq!(result, Some(60 * 980));
+    }
+
+    #[test]
+    fn test_part_two_third() {
+        let result = solve_all_part_2("179A", 2);
+        assert_eq!(result, Some(68 * 179));
+    }
+
+    #[test]
+    fn test_part_two_fourth() {
+        let result = solve_all_part_2("456A", 2);
+        assert_eq!(result, Some(64 * 456));
+    }
+    #[test]
+
+    fn test_part_two_fifth() {
+        let result = solve_all_part_2("379A", 2);
+        assert_eq!(result, Some(64 * 379));
     }
 }
