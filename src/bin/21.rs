@@ -720,8 +720,8 @@ fn move_count_numpad(
         return 1;
     }
 
-    // let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
-    let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
+    let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
+    // let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
     pushes_needed(cache, depth, next_sequence) // Keep depth
 }
 
