@@ -239,8 +239,8 @@ fn do_command(state: &State, human_command: &DirPad) -> Option<State> {
     })
 }
 
-fn make_partial_goal_part_1(c: &char) -> State {
-    let numpad = match c {
+fn parse_numpad(c: &char) -> NumPad {
+    match c {
         '0' => NumPad::Zero,
         '1' => NumPad::One,
         '2' => NumPad::Two,
@@ -255,8 +255,11 @@ fn make_partial_goal_part_1(c: &char) -> State {
         _ => {
             panic!("{}", format!("Illegal char {}!", c))
         }
-    };
+    }
+}
 
+fn make_partial_goal_part_1(c: &char) -> State {
+    let numpad = parse_numpad(c);
     State {
         numpad,
         directional_pads: vec![DirPad::A, DirPad::A],
@@ -400,6 +403,67 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(total_complexity)
 }
 
+fn optimal_numpad_path(from: NumPad, to: NumPad) -> Vec<DirPad> {
+    let mut solution = vec![];
+    let from_coord = coord_from_numpad
+        .get(&from)
+        .expect("should find coord coord from numpad");
+    let target_coord = coord_from_numpad
+        .get(&to)
+        .expect("should find coord coord from numpad");
+
+    let vertical_dir = if target_coord.0 > from_coord.0 {
+        DirPad::Up
+    } else {
+        DirPad::Down
+    };
+    let vertical_abs_diff = target_coord.0.abs_diff(from_coord.0);
+
+    let horizontal_dir = if target_coord.1 > from_coord.1 {
+        DirPad::Left
+    } else {
+        DirPad::Right
+    };
+    let horizontal_abs_diff = target_coord.1.abs_diff(from_coord.1);
+
+    match from {
+        NumPad::Seven | NumPad::Four | NumPad::One => {
+            // Left column. Go horizontally then vertically
+            for _ in 0..horizontal_abs_diff {
+                solution.push(horizontal_dir);
+            }
+            for _ in 0..vertical_abs_diff {
+                solution.push(vertical_dir);
+            }
+        }
+
+        NumPad::Two
+        | NumPad::Three
+        | NumPad::Five
+        | NumPad::Six
+        | NumPad::Eight
+        | NumPad::Nine
+        | NumPad::Zero
+        | NumPad::A => {
+            // Middle or right column. Go vertically and then horizontally
+            for _ in 0..vertical_abs_diff {
+                solution.push(vertical_dir);
+            }
+            for _ in 0..horizontal_abs_diff {
+                solution.push(horizontal_dir);
+            }
+        }
+    }
+    solution
+}
+
+fn optimal_numpad_path_with_a(from: NumPad, to: NumPad) -> Vec<DirPad> {
+    optimal_numpad_path(from, to)
+        .into_iter()
+        .chain([DirPad::A])
+        .collect()
+}
+
 fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
     match to {
         DirPad::Up => match from {
@@ -441,7 +505,10 @@ fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
 }
 
 fn optimal_dirpad_path_with_a(from: DirPad, to: DirPad) -> Vec<DirPad> {
-    optimal_dirpad_path(from, to).into_iter().chain([DirPad::A]).collect()
+    optimal_dirpad_path(from, to)
+        .into_iter()
+        .chain([DirPad::A])
+        .collect()
 }
 
 fn presses_needed(
@@ -452,7 +519,10 @@ fn presses_needed(
 ) -> u64 {
     if depth == 0 {
         let optimal = optimal_dirpad_path_with_a(from, to);
-        return optimal.len().try_into().expect("Should convert usize to u64");
+        return optimal
+            .len()
+            .try_into()
+            .expect("Should convert usize to u64");
     }
 
     // Check cache
@@ -472,14 +542,52 @@ fn presses_needed(
 
     return result;
 }
+fn solve_single_part_2(
+    code: &str,
+    max_depth: usize,
+    cache: &mut HashMap<(usize, DirPad, DirPad), u64>,
+) -> u64 {
+    let prepended_code: Vec<char> = ['A'].into_iter().chain(code.chars()).collect();
+    // let optimal_numpad_full_path = optimal_numpad_path(from, to)
+    let button_presses: u64 = prepended_code
+        .iter()
+        .tuple_windows::<(_, _)>()
+        .map(|(from_numpad_char, to_numpad_char)| {
+            let from_numpad = parse_numpad(from_numpad_char);
+            let to_numpad = parse_numpad(to_numpad_char);
+            let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
 
+            // We know that there are no consecutive numpad numbers/A's in the input, so we can use tuple_windows safely
+            let button_presses: u64 = opt_numpad_path.iter().tuple_windows().map(|(from_dirpad, to_dirpad)| {
+                presses_needed(cache, max_depth, *from_dirpad, *to_dirpad)
+            }).sum();
 
+            // let button_presses = presses_needed(cache, depth, from_numpad, to_numpad);
+            button_presses
+        })
+        .sum();
 
-// fn solve_part_2(code: &str) -> {
+    let numeric_part: u64 = code[0..3].parse().expect("Should parse numeric part!");
+    let complexity: u64 = button_presses * numeric_part;
 
-// }
+    // 0
+    complexity
+}
 
-pub fn part_two(input: &str) -> Option<u32> {
+fn solve_all_part_2(input: &str, max_depth: usize) -> Option<u64> {
+    let codes = input.lines().collect_vec();
+
+    let mut cache: HashMap<(usize, DirPad, DirPad), u64> = HashMap::new();
+
+    let total_complexity = codes
+        .iter()
+        .map(|code| solve_single_part_2(code, max_depth, &mut cache))
+        .sum();
+
+    Some(total_complexity)
+}
+
+pub fn part_two(input: &str) -> Option<u64> {
     // Idea: Bottom-up solution
     // TODO: Create map of optimal dirpad presses to get between any two numpad values
 
@@ -487,7 +595,7 @@ pub fn part_two(input: &str) -> Option<u32> {
     // The key idea here is that since we know every robot arm that is more shallow needs to be at A
     // to end up in our situation, we can cache these.
 
-    None
+    solve_all_part_2(input, 25)
 }
 
 #[cfg(test)]
@@ -502,7 +610,7 @@ mod tests {
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        let result = solve_all_part_2(&advent_of_code::template::read_file("examples", DAY), 2);
+        assert_eq!(result, Some(126384));
     }
 }
