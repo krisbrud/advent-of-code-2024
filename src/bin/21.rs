@@ -458,9 +458,13 @@ fn optimal_numpad_path(from: NumPad, to: NumPad) -> Vec<DirPad> {
 }
 
 fn optimal_numpad_path_with_a(from: NumPad, to: NumPad) -> Vec<DirPad> {
-    optimal_numpad_path(from, to)
+    // optimal_numpad_path(from, to)
+    //     .into_iter()
+    //     .chain([DirPad::A])
+    //     .collect()
+    [DirPad::A]
         .into_iter()
-        .chain([DirPad::A])
+        .chain(optimal_numpad_path(from, to))
         .collect()
 }
 
@@ -558,9 +562,13 @@ fn solve_single_part_2(
             let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
 
             // We know that there are no consecutive numpad numbers/A's in the input, so we can use tuple_windows safely
-            let button_presses: u64 = opt_numpad_path.iter().tuple_windows().map(|(from_dirpad, to_dirpad)| {
-                presses_needed(cache, max_depth, *from_dirpad, *to_dirpad)
-            }).sum();
+            let button_presses: u64 = opt_numpad_path
+                .iter()
+                .tuple_windows()
+                .map(|(from_dirpad, to_dirpad)| {
+                    presses_needed(cache, max_depth, *from_dirpad, *to_dirpad)
+                })
+                .sum();
 
             // let button_presses = presses_needed(cache, depth, from_numpad, to_numpad);
             button_presses
