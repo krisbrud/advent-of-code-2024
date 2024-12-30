@@ -447,8 +447,7 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
                         solution.push(horizontal_dir);
                     }
                 }
-                NumPad::Zero |
-                NumPad::A => {
+                NumPad::Zero | NumPad::A => {
                     // Left column ending in bottom
                     // Go right then down
                     for _ in 0..horizontal_abs_diff {
@@ -457,16 +456,11 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
                     for _ in 0..vertical_abs_diff {
                         solution.push(vertical_dir);
                     }
-                },
+                }
             }
         }
 
-        NumPad::Two
-        | NumPad::Three
-        | NumPad::Five
-        | NumPad::Six
-        | NumPad::Eight
-        | NumPad::Nine => {
+        NumPad::Two | NumPad::Three | NumPad::Five | NumPad::Six | NumPad::Eight | NumPad::Nine => {
             // Middle or right column.
             if horizontal_dir == DirPad::Left {
                 for _ in 0..horizontal_abs_diff {
@@ -475,7 +469,8 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
                 for _ in 0..vertical_abs_diff {
                     solution.push(vertical_dir);
                 }
-            } else { // horizontal dir right, do that last
+            } else {
+                // horizontal dir right, do that last
                 for _ in 0..vertical_abs_diff {
                     solution.push(vertical_dir);
                 }
@@ -484,8 +479,7 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
                 }
             }
         }
-        | NumPad::Zero
-        | NumPad::A => {
+        NumPad::Zero | NumPad::A => {
             match to {
                 NumPad::One | NumPad::Four | NumPad::Seven => {
                     // Up then left
@@ -498,7 +492,8 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
                         for _ in 0..vertical_abs_diff {
                             solution.push(vertical_dir);
                         }
-                    } else { // horizontal dir right, do that last
+                    } else {
+                        // horizontal dir right, do that last
                         for _ in 0..vertical_abs_diff {
                             solution.push(vertical_dir);
                         }
@@ -681,17 +676,16 @@ fn pushes_needed(
     //     optimal_dirpad_parent_path_with_a_suffix(from, to)
     // };
 
-    let result = desired_sequence
-        .iter()
+    // let result = desired_sequence
+    let result = [DirPad::A].iter().chain(
+        desired_sequence
+        .iter())
         .tuple_windows()
-        .map(|(next_from, next_to)|  {
-            if next_from == next_to {
-                1
-            } else {
-                // let next_sequence = optimal_dirpad_parent_path_with_a_suffix(*next_from, *next_to);
-                let next_sequence = optimal_dirpad_parent_path_with_a_prefix_suffix(*next_from, *next_to);
-                pushes_needed(cache, depth - 1, next_sequence)
-            }
+        .map(|(next_from, next_to)| {
+            // let next_sequence = optimal_dirpad_parent_path_with_a_prefix_suffix(*next_from, *next_to);
+            // let next_sequence = optimal_dirpad_parent_path_with_a_suffix(*next_from, *next_to);
+            // pushes_needed(cache, depth - 1, next_sequence)
+            move_count_dirpad(cache, *next_from, *next_to, depth)
         })
         .sum();
 
@@ -699,6 +693,38 @@ fn pushes_needed(
 
     return result;
 }
+
+// Inspired by https://www.reddit.com/r/adventofcode/comments/1hj2odw/comment/m36j01x/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+fn move_count_dirpad(
+    cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
+    from: DirPad,
+    to: DirPad,
+    depth: usize,
+) -> u64 {
+    if from == to {
+        return 1;
+    }
+
+    let next_sequence = optimal_dirpad_parent_path_with_a_suffix(from, to);
+    // let next_sequence = optimal_dirpad_parent_path_with_a_prefix_suffix(from, to);
+    pushes_needed(cache, depth - 1, next_sequence)
+}
+
+fn move_count_numpad(
+    cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
+    from: NumPad,
+    to: NumPad,
+    depth: usize,
+) -> u64 {
+    if from == to {
+        return 1;
+    }
+
+    // let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
+    let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
+    pushes_needed(cache, depth, next_sequence) // Keep depth
+}
+
 fn solve_single_part_2(
     code: &str,
     max_depth: usize,
@@ -713,9 +739,10 @@ fn solve_single_part_2(
             let from_numpad = parse_numpad(from_numpad_char);
             let to_numpad = parse_numpad(to_numpad_char);
             // let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
-            let opt_parent_numpad_pushes =
-                optimal_numpad_parent_path_with_a_suffix(from_numpad, to_numpad);
-                // optimal_numpad_parent_path_with_a_prefix_suffix(from_numpad, to_numpad);
+            // let opt_parent_numpad_pushes =
+            //     // optimal_numpad_parent_path_with_a_suffix(from_numpad, to_numpad);
+            //     optimal_numpad_parent_path_with_a_prefix_suffix(from_numpad, to_numpad);
+            let button_presses: u64 = move_count_numpad(cache, from_numpad, to_numpad, max_depth);
 
             // let button_presses: u64 = opt_parent_numpad_pushes
             //     .iter()
@@ -727,7 +754,12 @@ fn solve_single_part_2(
             //         pushes_needed(cache, max_depth, *from_dirpad, *to_dirpad)
             //     })
             //     .sum();
-            let button_presses = pushes_needed(cache, max_depth, opt_parent_numpad_pushes);
+            // let button_presses: u64 = opt_parent_numpad_pushes
+            //     .iter()
+            //     .tuple_windows()
+            //     .map(|(from, to)| move_count_numpad(cache, *from, *to, max_depth))
+            //     .sum();
+            // pushes_needed(cache, max_depth, opt_parent_numpad_pushes);
             // let button_presses = presses_needed(cache, depth, from_numpad, to_numpad);
             button_presses
         })
@@ -767,6 +799,7 @@ pub fn part_two(input: &str) -> Option<u64> {
     // to end up in our situation, we can cache these.
 
     solve_all_part_2(input, 25)
+    // 268750622157767 too high
 }
 
 /*
