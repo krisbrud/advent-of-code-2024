@@ -230,7 +230,6 @@ fn do_command(state: &State, human_command: &DirPad) -> Option<State> {
         (state.numpad, false)
     };
 
-
     // println!("At end of doing command {:?}", human_command);
 
     Some(State {
@@ -378,14 +377,14 @@ fn bfs(start: State, goal: State) -> u64 {
 // (A, A, A), (0, A, A), (2, A, A), (9, A, A), (A, A, A)
 // and pressing A on our directional pad after each
 
-// Returns complexity
 fn solve_single(code: &str) -> u64 {
     let partial_goal_states = partial_goals(code);
 
-    let moves: u64 = partial_goal_states.iter().tuple_windows::<(_,_)>()
-        .map(|(start, goal)| {
-            bfs(start.clone(), goal.clone())
-        }).sum();
+    let moves: u64 = partial_goal_states
+        .iter()
+        .tuple_windows::<(_, _)>()
+        .map(|(start, goal)| bfs(start.clone(), goal.clone()))
+        .sum();
 
     let numeric_part: u64 = code[0..3].parse().expect("Should parse numeric part!");
 
@@ -401,7 +400,93 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(total_complexity)
 }
 
+fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
+    match to {
+        DirPad::Up => match from {
+            DirPad::Up => vec![],
+            DirPad::A => vec![DirPad::Left],
+            DirPad::Left => vec![DirPad::Right, DirPad::Up],
+            DirPad::Down => vec![DirPad::Up],
+            DirPad::Right => vec![DirPad::Left, DirPad::Up],
+        },
+        DirPad::A => match from {
+            DirPad::Up => vec![DirPad::Right],
+            DirPad::A => vec![],
+            DirPad::Left => vec![DirPad::Right, DirPad::Right, DirPad::Up],
+            DirPad::Down => vec![DirPad::Right, DirPad::Up],
+            DirPad::Right => vec![DirPad::Up],
+        },
+        DirPad::Left => match from {
+            DirPad::Up => vec![DirPad::Down, DirPad::Left],
+            DirPad::A => vec![DirPad::Down, DirPad::Left, DirPad::Left],
+            DirPad::Left => vec![],
+            DirPad::Down => vec![DirPad::Left],
+            DirPad::Right => vec![DirPad::Left, DirPad::Left],
+        },
+        DirPad::Down => match from {
+            DirPad::Up => vec![DirPad::Down],
+            DirPad::A => vec![DirPad::Down, DirPad::Left],
+            DirPad::Left => vec![DirPad::Right],
+            DirPad::Down => vec![],
+            DirPad::Right => vec![DirPad::Left],
+        },
+        DirPad::Right => match from {
+            DirPad::Up => vec![DirPad::Down, DirPad::Right],
+            DirPad::A => vec![DirPad::Down],
+            DirPad::Left => vec![DirPad::Right, DirPad::Right],
+            DirPad::Down => vec![DirPad::Right],
+            DirPad::Right => vec![],
+        },
+    }
+}
+
+fn optimal_dirpad_path_with_a(from: DirPad, to: DirPad) -> Vec<DirPad> {
+    optimal_dirpad_path(from, to).into_iter().chain([DirPad::A]).collect()
+}
+
+fn presses_needed(
+    cache: &mut HashMap<(usize, DirPad, DirPad), u64>,
+    depth: usize,
+    from: DirPad,
+    to: DirPad,
+) -> u64 {
+    if depth == 0 {
+        let optimal = optimal_dirpad_path_with_a(from, to);
+        return optimal.len().try_into().expect("Should convert usize to u64");
+    }
+
+    // Check cache
+    if let Some(cached_result) = cache.get(&(depth, from, to)) {
+        return *cached_result;
+    }
+
+    let parent_pushes = optimal_dirpad_path_with_a(from, to);
+
+    let result = parent_pushes
+        .iter()
+        .tuple_windows()
+        .map(|(next_from, next_to)| presses_needed(cache, depth - 1, *next_from, *next_to))
+        .sum();
+
+    cache.insert((depth, from, to), result);
+
+    return result;
+}
+
+
+
+// fn solve_part_2(code: &str) -> {
+
+// }
+
 pub fn part_two(input: &str) -> Option<u32> {
+    // Idea: Bottom-up solution
+    // TODO: Create map of optimal dirpad presses to get between any two numpad values
+
+    // Want to recursively find the number of human presses we need to do a move at our current depth
+    // The key idea here is that since we know every robot arm that is more shallow needs to be at A
+    // to end up in our situation, we can cache these.
+
     None
 }
 
