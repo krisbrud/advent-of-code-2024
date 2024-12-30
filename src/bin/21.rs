@@ -567,17 +567,17 @@ fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
 //     solution
 // }
 
-// fn optimal_numpad_parent_path_with_a_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
-//     optimal_numpad_parent_pushes(from, to)
-//         .into_iter()
-//         .chain([DirPad::A])
-//         .collect()
-//     // [DirPad::A]
-//     //     .into_iter()
-//     //     .chain(optimal_numpad_path(from, to))
-//     //     .chain([DirPad])
-//     //     .collect()
-// }
+fn optimal_numpad_parent_path_with_a_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
+    optimal_numpad_parent_pushes(from, to)
+        .into_iter()
+        .chain([DirPad::A])
+        .collect()
+    // [DirPad::A]
+    //     .into_iter()
+    //     .chain(optimal_numpad_path(from, to))
+    //     .chain([DirPad])
+    //     .collect()
+}
 
 fn optimal_numpad_parent_path_with_a_prefix_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
     // optimal_numpad_parent_pushes(from, to)
@@ -651,82 +651,58 @@ fn optimal_dirpad_parent_path_with_a_prefix_suffix(from: DirPad, to: DirPad) -> 
         .into_iter()
         .chain(optimal_dirpad_path(from, to).into_iter().chain([DirPad::A]))
         .collect()
-
-    // optimal_dirpad_path(from, to)
-    //     .into_iter()
-    //     .chain([DirPad::A])
-    //     .collect()
 }
 
 fn pushes_needed(
-    cache: &mut HashMap<(usize, DirPad, DirPad), u64>,
+    cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
     depth: usize,
-    from: DirPad,
-    to: DirPad,
+    desired_sequence: Vec<DirPad>,
 ) -> u64 {
-    if from == to {
-        return 1; // pressing A
-    }
-
     // If we are at zero depth (human keypad, just press the optimal path)
     if depth == 0 {
-        let optimal = optimal_dirpad_parent_path_with_a_suffix(from, to);
-        // let optimal = optimal_dirpad_path(from, to);
-        return optimal
-            .len()
-            .try_into()
-            .expect("Should convert usize to u64");
+        return desired_sequence.len().try_into().expect("Should convert");
+        // let optimal = optimal_dirpad_parent_path_with_a_suffix(from, to);
+        // // let optimal = optimal_dirpad_path(from, to);
+        // return optimal
+        //     .len()
+        //     .try_into()
+        //     .expect("Should convert usize to u64");
     }
 
     // Check cache if we already have a solution
-    if let Some(cached_result) = cache.get(&(depth, from, to)) {
+    if let Some(cached_result) = cache.get(&(depth, desired_sequence.clone())) {
         return *cached_result;
     }
 
     // Find the pushes the parent needs to take to move the dirpad from the current position to the desired one
-    let parent_pushes = if depth != 1 {
-        optimal_dirpad_parent_path_with_a_prefix_suffix(from, to)
-    } else {
-        optimal_dirpad_parent_path_with_a_suffix(from, to)
-    };
+    // let parent_pushes = if depth != 1 {
+    //     optimal_dirpad_parent_path_with_a_prefix_suffix(from, to)
+    // } else {
+    //     optimal_dirpad_parent_path_with_a_suffix(from, to)
+    // };
 
-    let result = parent_pushes
+    let result = desired_sequence
         .iter()
         .tuple_windows()
-        .map(|(next_from, next_to)| pushes_needed(cache, depth - 1, *next_from, *next_to))
+        .map(|(next_from, next_to)|  {
+            if next_from == next_to {
+                1
+            } else {
+                // let next_sequence = optimal_dirpad_parent_path_with_a_suffix(*next_from, *next_to);
+                let next_sequence = optimal_dirpad_parent_path_with_a_prefix_suffix(*next_from, *next_to);
+                pushes_needed(cache, depth - 1, next_sequence)
+            }
+        })
         .sum();
 
-    // let result = if parent_pushes.len() >= 2 {
-    //     parent_pushes
-    //     .iter()
-    //     .tuple_windows()
-    //     .map(|(next_from, next_to)| {
-    //         presses_needed(cache, depth - 1, DirPad::A, *next_from) +
-    //         presses_needed(cache, depth - 1, *next_from, *next_to)
-    //     }
-    //     )
-    //     .sum();
-
-    // let result = if parent_pushes.len() >= 2 {
-    //     parent_pushes
-    //     .iter()
-    //     .tuple_windows()
-    //     .map(|(next_from, next_to)| {
-    //         presses_needed(cache, depth - 1, DirPad::A, *next_from) +
-    //         presses_needed(cache, depth - 1, *next_from, *next_to)
-    //     }
-    //     )
-    //     .sum()
-    // } else { 1 };
-
-    cache.insert((depth, from, to), result);
+    cache.insert((depth, desired_sequence), result);
 
     return result;
 }
 fn solve_single_part_2(
     code: &str,
     max_depth: usize,
-    cache: &mut HashMap<(usize, DirPad, DirPad), u64>,
+    cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
 ) -> u64 {
     let prepended_code: Vec<char> = ['A'].into_iter().chain(code.chars()).collect();
     // let optimal_numpad_full_path = optimal_numpad_path(from, to)
@@ -738,20 +714,20 @@ fn solve_single_part_2(
             let to_numpad = parse_numpad(to_numpad_char);
             // let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
             let opt_parent_numpad_pushes =
-                // optimal_numpad_parent_path_with_a_suffix(from_numpad, to_numpad);
-                optimal_numpad_parent_path_with_a_prefix_suffix(from_numpad, to_numpad);
+                optimal_numpad_parent_path_with_a_suffix(from_numpad, to_numpad);
+                // optimal_numpad_parent_path_with_a_prefix_suffix(from_numpad, to_numpad);
 
-            let button_presses: u64 = opt_parent_numpad_pushes
-                .iter()
-                .tuple_windows()
-                // .map(|dirpad| {
-                .map(|(from_dirpad, to_dirpad)| {
-                    // pushes_needed(cache, max_depth, DirPad::A, *dirpad)
-                    // let bar = presses_needed(cache, max_depth, DirPad::A, *dirpad);
-                    pushes_needed(cache, max_depth, *from_dirpad, *to_dirpad)
-                })
-                .sum();
-
+            // let button_presses: u64 = opt_parent_numpad_pushes
+            //     .iter()
+            //     .tuple_windows()
+            //     // .map(|dirpad| {
+            //     .map(|(from_dirpad, to_dirpad)| {
+            //         // pushes_needed(cache, max_depth, DirPad::A, *dirpad)
+            //         // let bar = presses_needed(cache, max_depth, DirPad::A, *dirpad);
+            //         pushes_needed(cache, max_depth, *from_dirpad, *to_dirpad)
+            //     })
+            //     .sum();
+            let button_presses = pushes_needed(cache, max_depth, opt_parent_numpad_pushes);
             // let button_presses = presses_needed(cache, depth, from_numpad, to_numpad);
             button_presses
         })
@@ -767,7 +743,8 @@ fn solve_single_part_2(
 fn solve_all_part_2(input: &str, max_depth: usize) -> Option<u64> {
     let codes = input.lines().collect_vec();
 
-    let mut cache: HashMap<(usize, DirPad, DirPad), u64> = HashMap::new();
+    // let mut cache: HashMap<(usize, DirPad, DirPad), u64> = HashMap::new();
+    let mut cache: HashMap<(usize, Vec<DirPad>), u64> = HashMap::new();
 
     let total_complexity = codes
         .iter()
