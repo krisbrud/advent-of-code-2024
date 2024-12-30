@@ -275,37 +275,6 @@ fn partial_goals(code: &str) -> Vec<State> {
         .collect()
 }
 
-// // Assume going from top left to bottom right
-// fn bfs(board: &Board) -> Option<u32> {
-//     let mut visited: HashSet<Coord> = HashSet::new();
-//     let mut predecessors: HashMap<Coord, Coord> = HashMap::new();
-//     let mut queue: VecDeque<Coord> = VecDeque::new();
-//     let start: Coord = (0, 0);
-//     let goal: Coord = (board.rows - 1, board.cols - 1);
-//     queue.push_back(start);
-//     visited.insert(start);
-
-//     while let Some(coord) = queue.pop_front() {
-//         if coord == goal {
-//             return Some(backtrack_steps(&predecessors, start, coord));
-//         }
-
-//         let neighbors = neighbor_coordinates(&coord, board.rows, board.cols)
-//             .into_iter()
-//             .filter(|candidate| !visited.contains(candidate))
-//             .filter(|candidate| !board.occupied.contains(candidate))
-//             .collect_vec();
-
-//         for neigh in neighbors {
-//             visited.insert(neigh.clone());
-//             predecessors.insert(neigh.clone(), coord);
-//             queue.push_back(neigh.clone());
-//         }
-//     }
-
-//     None // No solution
-// }
-
 fn backtrack_steps(predecessors: &HashMap<State, State>, start: State, current: State) -> u64 {
     let predecessor = predecessors
         .get(&current)
@@ -521,18 +490,6 @@ fn optimal_numpad_parent_path_with_a_suffix(from: NumPad, to: NumPad) -> Vec<Dir
         .collect()
 }
 
-fn optimal_numpad_parent_path_with_a_prefix_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
-    // optimal_numpad_parent_pushes(from, to)
-    //     .into_iter()
-    //     .chain([DirPad::A])
-    //     .collect()
-    [DirPad::A]
-        .into_iter()
-        .chain(optimal_numpad_parent_pushes(from, to))
-        .chain([DirPad::A])
-        .collect()
-}
-
 fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
     match to {
         DirPad::Up => match from {
@@ -576,22 +533,9 @@ fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
 }
 
 fn optimal_dirpad_parent_path_with_a_suffix(from: DirPad, to: DirPad) -> Vec<DirPad> {
-    // [DirPad::A].into_iter().chain(
-    // optimal_dirpad_path(from, to)
-    //     .into_iter()
-    //     .chain([DirPad::A]))
-    //     .collect()
-
     optimal_dirpad_path(from, to)
         .into_iter()
         .chain([DirPad::A])
-        .collect()
-}
-
-fn optimal_dirpad_parent_path_with_a_prefix_suffix(from: DirPad, to: DirPad) -> Vec<DirPad> {
-    [DirPad::A]
-        .into_iter()
-        .chain(optimal_dirpad_path(from, to).into_iter().chain([DirPad::A]))
         .collect()
 }
 
@@ -603,9 +547,6 @@ fn pushes_needed(
     if let Some(cached_result) = cache.get(&(depth, desired_sequence.clone())) {
         return *cached_result;
     }
-
-    // If we are at zero depth (human keypad, just press the optimal path)
-    // let mut result = 0;
 
     let result = if depth == 0 {
         desired_sequence.len().try_into().expect("Should convert")
@@ -623,7 +564,6 @@ fn pushes_needed(
     return result;
 }
 
-// Inspired by https://www.reddit.com/r/adventofcode/comments/1hj2odw/comment/m36j01x/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 fn move_count_dirpad(
     cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
     from: DirPad,
@@ -635,7 +575,6 @@ fn move_count_dirpad(
     }
 
     let next_sequence = optimal_dirpad_parent_path_with_a_suffix(from, to);
-    // let next_sequence = optimal_dirpad_parent_path_with_a_prefix_suffix(from, to);
     pushes_needed(cache, depth - 1, next_sequence)
 }
 
@@ -649,9 +588,7 @@ fn move_count_numpad(
         return 1;
     }
 
-    // let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
     let next_sequence = optimal_numpad_parent_path_with_a_suffix(from, to);
-    // let next_sequence = optimal_numpad_parent_path_with_a_prefix_suffix(from, to);
     pushes_needed(cache, depth, next_sequence) // Keep depth
 }
 
@@ -675,9 +612,11 @@ fn solve_single_part_2(
     max_depth: usize,
     cache: &mut HashMap<(usize, Vec<DirPad>), u64>,
 ) -> u64 {
+    // First tried an approach with some hints from our company slack, but ended up with a stupid bug in the dirpad code
+    // which failed all of it. After about 8 hours of trying I decided to take some inspiration from https://www.reddit.com/r/adventofcode/comments/1hj2odw/comment/m36j01x/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+    // to finish up the chronicle
 
     let button_presses = get_button_presses(code, max_depth, cache);
-    println!("code: {}, button presses: {}", code, button_presses);
 
     let numeric_part: u64 = code[0..3].parse().expect("Should parse numeric part!");
     let complexity: u64 = button_presses * numeric_part;
@@ -693,7 +632,6 @@ fn empty_cache() -> HashMap<(usize, Vec<DirPad>), u64> {
 fn solve_all_part_2(input: &str, max_depth: usize) -> Option<u64> {
     let codes = input.lines().collect_vec();
 
-    // let mut cache: HashMap<(usize, DirPad, DirPad), u64> = HashMap::new();
     let mut cache = empty_cache();
 
     let total_complexity = codes
@@ -701,14 +639,12 @@ fn solve_all_part_2(input: &str, max_depth: usize) -> Option<u64> {
         .map(|code| solve_single_part_2(code, max_depth, &mut cache))
         .sum();
 
-    // for (k, v) in cache {
-    //     println!("key: {:?}, value: {}", k, v);
-    // }
-
     Some(total_complexity)
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
+
+
     // Idea: Bottom-up solution
     // TODO: Create map of optimal dirpad presses to get between any two numpad values
 
@@ -717,7 +653,6 @@ pub fn part_two(input: &str) -> Option<u64> {
     // to end up in our situation, we can cache these.
 
     solve_all_part_2(input, 25)
-    // 268750622157767 too high
 }
 
 /*
