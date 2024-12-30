@@ -403,7 +403,7 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(total_complexity)
 }
 
-fn optimal_numpad_path(from: NumPad, to: NumPad) -> Vec<DirPad> {
+fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
     let mut solution = vec![];
     let from_coord = coord_from_numpad
         .get(&from)
@@ -428,12 +428,36 @@ fn optimal_numpad_path(from: NumPad, to: NumPad) -> Vec<DirPad> {
 
     match from {
         NumPad::Seven | NumPad::Four | NumPad::One => {
-            // Left column. Go horizontally then vertically
-            for _ in 0..horizontal_abs_diff {
-                solution.push(horizontal_dir);
-            }
-            for _ in 0..vertical_abs_diff {
-                solution.push(vertical_dir);
+            match to {
+                NumPad::One
+                | NumPad::Two
+                | NumPad::Three
+                | NumPad::Four
+                | NumPad::Five
+                | NumPad::Six
+                | NumPad::Seven
+                | NumPad::Eight
+                | NumPad::Nine => {
+                    // Left column ending in middle
+                    // Go vertically then horizontally
+                    for _ in 0..vertical_abs_diff {
+                        solution.push(vertical_dir);
+                    }
+                    for _ in 0..horizontal_abs_diff {
+                        solution.push(horizontal_dir);
+                    }
+                }
+                NumPad::Zero |
+                NumPad::A => {
+                    // Left column ending in bottom
+                    // Go right then down
+                    for _ in 0..horizontal_abs_diff {
+                        solution.push(horizontal_dir);
+                    }
+                    for _ in 0..vertical_abs_diff {
+                        solution.push(vertical_dir);
+                    }
+                },
             }
         }
 
@@ -442,45 +466,130 @@ fn optimal_numpad_path(from: NumPad, to: NumPad) -> Vec<DirPad> {
         | NumPad::Five
         | NumPad::Six
         | NumPad::Eight
-        | NumPad::Nine
+        | NumPad::Nine => {
+            // Middle or right column.
+            if horizontal_dir == DirPad::Left {
+                for _ in 0..horizontal_abs_diff {
+                    solution.push(horizontal_dir);
+                }
+                for _ in 0..vertical_abs_diff {
+                    solution.push(vertical_dir);
+                }
+            } else { // horizontal dir right, do that last
+                for _ in 0..vertical_abs_diff {
+                    solution.push(vertical_dir);
+                }
+                for _ in 0..horizontal_abs_diff {
+                    solution.push(horizontal_dir);
+                }
+            }
+        }
         | NumPad::Zero
         | NumPad::A => {
-            // Middle or right column. Go vertically and then horizontally
-            for _ in 0..vertical_abs_diff {
-                solution.push(vertical_dir);
-            }
-            for _ in 0..horizontal_abs_diff {
-                solution.push(horizontal_dir);
+            match to {
+                NumPad::One | NumPad::Four | NumPad::Seven => {
+                    // Up then left
+                }
+                _ => {
+                    if horizontal_dir == DirPad::Left {
+                        for _ in 0..horizontal_abs_diff {
+                            solution.push(horizontal_dir);
+                        }
+                        for _ in 0..vertical_abs_diff {
+                            solution.push(vertical_dir);
+                        }
+                    } else { // horizontal dir right, do that last
+                        for _ in 0..vertical_abs_diff {
+                            solution.push(vertical_dir);
+                        }
+                        for _ in 0..horizontal_abs_diff {
+                            solution.push(horizontal_dir);
+                        }
+                    }
+                }
             }
         }
     }
     solution
 }
 
-fn optimal_numpad_parent_pushes_with_a_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
-    optimal_numpad_path(from, to)
-        .into_iter()
-        .chain([DirPad::A])
-        .collect()
-    // [DirPad::A]
-    //     .into_iter()
-    //     .chain(optimal_numpad_path(from, to))
-    //     .chain([DirPad])
-    //     .collect()
-}
+// fn optimal_numpad_parent_pushes(from: NumPad, to: NumPad) -> Vec<DirPad> {
+//     let mut solution = vec![];
+//     let from_coord = coord_from_numpad
+//         .get(&from)
+//         .expect("should find coord coord from numpad");
+//     let target_coord = coord_from_numpad
+//         .get(&to)
+//         .expect("should find coord coord from numpad");
+
+//     let vertical_dir = if target_coord.0 > from_coord.0 {
+//         DirPad::Up
+//     } else {
+//         DirPad::Down
+//     };
+//     let vertical_abs_diff = target_coord.0.abs_diff(from_coord.0);
+
+//     let horizontal_dir = if target_coord.1 > from_coord.1 {
+//         DirPad::Left
+//     } else {
+//         DirPad::Right
+//     };
+//     let horizontal_abs_diff = target_coord.1.abs_diff(from_coord.1);
+
+//     match from {
+//         NumPad::Seven | NumPad::Four | NumPad::One => {
+//             // Left column. Go horizontally then vertically
+//             for _ in 0..horizontal_abs_diff {
+//                 solution.push(horizontal_dir);
+//             }
+//             for _ in 0..vertical_abs_diff {
+//                 solution.push(vertical_dir);
+//             }
+//         }
+
+//         NumPad::Two
+//         | NumPad::Three
+//         | NumPad::Five
+//         | NumPad::Six
+//         | NumPad::Eight
+//         | NumPad::Nine
+//         | NumPad::Zero
+//         | NumPad::A => {
+//             // Middle or right column. Go vertically and then horizontally
+//             for _ in 0..vertical_abs_diff {
+//                 solution.push(vertical_dir);
+//             }
+//             for _ in 0..horizontal_abs_diff {
+//                 solution.push(horizontal_dir);
+//             }
+//         }
+//     }
+//     solution
+// }
+
+// fn optimal_numpad_parent_path_with_a_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
+//     optimal_numpad_parent_pushes(from, to)
+//         .into_iter()
+//         .chain([DirPad::A])
+//         .collect()
+//     // [DirPad::A]
+//     //     .into_iter()
+//     //     .chain(optimal_numpad_path(from, to))
+//     //     .chain([DirPad])
+//     //     .collect()
+// }
 
 fn optimal_numpad_parent_path_with_a_prefix_suffix(from: NumPad, to: NumPad) -> Vec<DirPad> {
-    optimal_numpad_path(from, to)
+    // optimal_numpad_parent_pushes(from, to)
+    //     .into_iter()
+    //     .chain([DirPad::A])
+    //     .collect()
+    [DirPad::A]
         .into_iter()
+        .chain(optimal_numpad_parent_pushes(from, to))
         .chain([DirPad::A])
         .collect()
-    // [DirPad::A]
-    //     .into_iter()
-    //     .chain(optimal_numpad_path(from, to))
-    //     .chain([DirPad])
-    //     .collect()
 }
-
 
 fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
     match to {
@@ -495,7 +604,8 @@ fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
             DirPad::Up => vec![DirPad::Right],
             DirPad::A => vec![],
             DirPad::Left => vec![DirPad::Right, DirPad::Right, DirPad::Up],
-            DirPad::Down => vec![DirPad::Right, DirPad::Up],
+            // DirPad::Down => vec![DirPad::Right, DirPad::Up],
+            DirPad::Down => vec![DirPad::Up, DirPad::Right],
             DirPad::Right => vec![DirPad::Up],
         },
         DirPad::Left => match from {
@@ -507,7 +617,8 @@ fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
         },
         DirPad::Down => match from {
             DirPad::Up => vec![DirPad::Down],
-            DirPad::A => vec![DirPad::Down, DirPad::Left],
+            // DirPad::A => vec![DirPad::Down, DirPad::Left],
+            DirPad::A => vec![DirPad::Left, DirPad::Down],
             DirPad::Left => vec![DirPad::Right],
             DirPad::Down => vec![],
             DirPad::Right => vec![DirPad::Left],
@@ -522,7 +633,7 @@ fn optimal_dirpad_path(from: DirPad, to: DirPad) -> Vec<DirPad> {
     }
 }
 
-fn optimal_dirpad_parent_pushes_with_a_suffix(from: DirPad, to: DirPad) -> Vec<DirPad> {
+fn optimal_dirpad_parent_path_with_a_suffix(from: DirPad, to: DirPad) -> Vec<DirPad> {
     // [DirPad::A].into_iter().chain(
     // optimal_dirpad_path(from, to)
     //     .into_iter()
@@ -535,51 +646,54 @@ fn optimal_dirpad_parent_pushes_with_a_suffix(from: DirPad, to: DirPad) -> Vec<D
         .collect()
 }
 
-fn presses_needed(
+fn optimal_dirpad_parent_path_with_a_prefix_suffix(from: DirPad, to: DirPad) -> Vec<DirPad> {
+    [DirPad::A]
+        .into_iter()
+        .chain(optimal_dirpad_path(from, to).into_iter().chain([DirPad::A]))
+        .collect()
+
+    // optimal_dirpad_path(from, to)
+    //     .into_iter()
+    //     .chain([DirPad::A])
+    //     .collect()
+}
+
+fn pushes_needed(
     cache: &mut HashMap<(usize, DirPad, DirPad), u64>,
     depth: usize,
     from: DirPad,
     to: DirPad,
 ) -> u64 {
+    if from == to {
+        return 1; // pressing A
+    }
+
+    // If we are at zero depth (human keypad, just press the optimal path)
     if depth == 0 {
-        let optimal = optimal_dirpad_parent_pushes_with_a_suffix(from, to);
+        let optimal = optimal_dirpad_parent_path_with_a_suffix(from, to);
+        // let optimal = optimal_dirpad_path(from, to);
         return optimal
             .len()
             .try_into()
             .expect("Should convert usize to u64");
     }
 
-    // Check cache
+    // Check cache if we already have a solution
     if let Some(cached_result) = cache.get(&(depth, from, to)) {
         return *cached_result;
     }
 
-    // let parent_pushes = if depth != 1 {
-    //     optimal_dirpad_path(DirPad::A, from) // Doesn't come for free unless we are one step away from the human pressing buttons
-    //         .into_iter()
-    //         .chain(optimal_dirpad_parent_pushes_with_a_suffix(from, to).into_iter())
-    //         .collect_vec()
-    // } else {
-    //     optimal_dirpad_parent_pushes_with_a_suffix(from, to)
-    // };
+    // Find the pushes the parent needs to take to move the dirpad from the current position to the desired one
+    let parent_pushes = if depth != 1 {
+        optimal_dirpad_parent_path_with_a_prefix_suffix(from, to)
+    } else {
+        optimal_dirpad_parent_path_with_a_suffix(from, to)
+    };
 
-    let parent_pushes = optimal_dirpad_parent_pushes_with_a_suffix(from, to);
-    // let parent_pushes = [DirPad::A].into_iter().chain(optimal_dirpad_path_with_a_suffix(from, to).into_iter()).collect_vec();
-
-    // let result = parent_pushes
-    //     .iter()
-    //     .tuple_windows()
-    //     .map(|(next_from, next_to)| presses_needed(cache, depth - 1, *next_from, *next_to))
-    //     .sum();
-
-    let result = if parent_pushes.len() >= 2 {
-        parent_pushes
+    let result = parent_pushes
         .iter()
         .tuple_windows()
-        .map(|(next_from, next_to)| {
-            presses_needed(cache, depth - 1, *next_from, *next_to)
-        }
-        )
+        .map(|(next_from, next_to)| pushes_needed(cache, depth - 1, *next_from, *next_to))
         .sum();
 
     // let result = if parent_pushes.len() >= 2 {
@@ -593,7 +707,6 @@ fn presses_needed(
     //     )
     //     .sum();
 
-
     // let result = if parent_pushes.len() >= 2 {
     //     parent_pushes
     //     .iter()
@@ -605,7 +718,6 @@ fn presses_needed(
     //     )
     //     .sum()
     // } else { 1 };
-
 
     cache.insert((depth, from, to), result);
 
@@ -625,15 +737,18 @@ fn solve_single_part_2(
             let from_numpad = parse_numpad(from_numpad_char);
             let to_numpad = parse_numpad(to_numpad_char);
             // let opt_numpad_path = optimal_numpad_path_with_a(from_numpad, to_numpad);
-            let opt_parent_numpad_pushes = optimal_numpad_parent_pushes_with_a_suffix(from_numpad, to_numpad);
+            let opt_parent_numpad_pushes =
+                // optimal_numpad_parent_path_with_a_suffix(from_numpad, to_numpad);
+                optimal_numpad_parent_path_with_a_prefix_suffix(from_numpad, to_numpad);
 
-            // We know that there are no consecutive numpad numbers/A's in the input, so we can use tuple_windows safely
             let button_presses: u64 = opt_parent_numpad_pushes
                 .iter()
                 .tuple_windows()
+                // .map(|dirpad| {
                 .map(|(from_dirpad, to_dirpad)| {
-                    // presses_needed(cache, max_depth, DirPad::A, *from_dirpad) +
-                    presses_needed(cache, max_depth, *from_dirpad, *to_dirpad)
+                    // pushes_needed(cache, max_depth, DirPad::A, *dirpad)
+                    // let bar = presses_needed(cache, max_depth, DirPad::A, *dirpad);
+                    pushes_needed(cache, max_depth, *from_dirpad, *to_dirpad)
                 })
                 .sum();
 
@@ -714,6 +829,7 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = solve_all_part_2(&advent_of_code::template::read_file("examples", DAY), 2);
+        // let result = solve_all_part_2(&advent_of_code::template::read_file("examples", DAY), 3);
         assert_eq!(result, Some(126384));
     }
 }
